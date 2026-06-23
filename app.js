@@ -209,6 +209,19 @@ import { track, initStatsBar } from './stats.js';
   });
 }
 
+// ── Prediction Engine Constants ────────────────────────────────
+// Per-branch 2026 market factor: < 1.0 = cutoff compresses (harder), > 1.0 = expands (easier)
+const MARKET_FACTOR = {
+  'CSE': 0.92, 'CSD': 0.94, 'CSM': 0.94, 'AIML': 0.95, 'CIC': 0.95, 'CSO': 0.95, 'IDS': 0.95,
+  'IT':  0.98, 'INF': 0.98, 'CSW': 0.98,
+  'ECE': 1.05,
+  'EEE': 1.15, 'EIE': 1.15, 'ECM': 1.15,
+  'MEC': 1.35, 'CIV': 1.30, 'CHE': 1.30, 'MIN': 1.40
+};
+const NAAC_GRADE_SCORES = { 'A++': 10, 'A+': 8, 'NAAC A+': 8, 'A': 6, 'NAAC A': 6, 'B++': 4, 'B+': 3, 'B': 2 };
+const MAX_QUALIFYING_RANK = 120000;
+const GOVERNMENT_ADJACENT_TYPES = ['GOV', 'UNIV', 'SF'];
+
 // ── App State ──────────────────────────────────────────────────
 const state = {
   rankMode: 'rank',
@@ -232,7 +245,7 @@ const state = {
   filterHostel: false,
   filterNaac: false,
   sortBy: 'recommended',
-  viewMode: 'card',   // 'card' | 'table'
+  viewMode: 'table',  // predictor is always table; cards live in the ranking panel
   rankBuffer: 0,
 
   compareList: [],
@@ -263,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   calculateRankAndReimbursement();
   renderPredictor();
+  renderCollegeRanking();
   renderCompare();
   renderChecklist();
   renderTimeline();
@@ -322,8 +336,8 @@ function buildShareUrl() {
 }
 
 // ── Mobile sidebar toggle ──────────────────────────────────────
-const TOGGLE_OPEN_HTML  = `<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Edit Profile`;
-const TOGGLE_CLOSE_HTML = `<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Close`;
+const TOGGLE_OPEN_HTML  = `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+const TOGGLE_CLOSE_HTML = `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
 function initMobileToggle() {
   const toggle = document.getElementById('sidebar-mobile-toggle');
@@ -364,9 +378,10 @@ function initTabs() {
       document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
       updateFabBar();
-      if (tabName === 'predictor')        renderPredictor();
+      if (tabName === 'predictor')             renderPredictor();
+      else if (tabName === 'colleges')         renderCollegeRanking();
       else if (tabName === 'option-simulator') renderSimulator();
-      else if (tabName === 'compare')     renderCompare();
+      else if (tabName === 'compare')          renderCompare();
     });
   });
 }
@@ -425,7 +440,7 @@ function initFormBindings() {
     const womensRow = document.getElementById('womens-prioritize-row');
     if (womensRow) womensRow.style.display = state.gender === 'GIRLS' ? '' : 'none';
     if (state.gender !== 'GIRLS') { state.prioritizeWomens = false; const cb = document.getElementById('prioritize-womens'); if (cb) cb.checked = false; }
-    calculateRankAndReimbursement(); renderPredictor();
+    calculateRankAndReimbursement(); renderPredictor(); renderCollegeRanking();
     updateMobileProfileBar();
   }));
   document.getElementById('prioritize-womens')?.addEventListener('change', e => {
@@ -439,13 +454,58 @@ function initFormBindings() {
     state.tsStudy = e.target.checked; calculateRankAndReimbursement();
   });
   document.getElementById('student-category').addEventListener('change', e => {
-    state.category = e.target.value; calculateRankAndReimbursement(); renderPredictor(); renderEligibilityWarning();
+    state.category = e.target.value; calculateRankAndReimbursement(); renderPredictor(); renderEligibilityWarning(); renderCollegeRanking();
     updateMobileProfileBar();
   });
   document.getElementById('student-region').addEventListener('change', e => {
     state.region = e.target.value; calculateRankAndReimbursement(); renderPredictor();
     updateMobileProfileBar();
   });
+}
+
+// ── Marks → Rank Interpolation ────────────────────────────────
+// Official 2026 density anchors (June analysis). Linear interpolation between brackets.
+const RANK_ANCHORS = [
+  { marks: 160, rank:      1 },
+  { marks: 140, rank:    500 },
+  { marks: 120, rank:   2500 },
+  { marks: 100, rank:   6000 },
+  { marks:  90, rank:   9500 },
+  { marks:  80, rank:  14500 },
+  { marks:  70, rank:  24000 },
+  { marks:  60, rank:  39000 },
+  { marks:  50, rank:  68000 },
+  { marks:  40, rank: 110000 }
+];
+
+function estimateRank(marks) {
+  const m = parseInt(marks) || 0;
+  if (m < 40)  return 200000;
+  if (m >= 160) return 1;
+  for (let i = 0; i < RANK_ANCHORS.length - 1; i++) {
+    const hi = RANK_ANCHORS[i], lo = RANK_ANCHORS[i + 1];
+    if (m <= hi.marks && m > lo.marks) {
+      const t = (m - lo.marks) / (hi.marks - lo.marks);
+      return Math.round(lo.rank - t * (lo.rank - hi.rank));
+    }
+  }
+  return RANK_ANCHORS[RANK_ANCHORS.length - 1].rank;
+}
+
+// ── Fee Reimbursement (per-college, for card badges) ───────────
+function calculateFees(fee, rank, category) {
+  if (['SC', 'ST'].some(c => category.includes(c))) {
+    return { pay: 0, text: 'Full Waiver (100%)', isFree: true };
+  }
+  if (rank > 0 && rank <= 10000) {
+    return { pay: 0, text: 'Merit Waiver (<10k Rank)', isFree: true };
+  }
+  const studentPays = Math.max(0, (fee || 0) - 35000);
+  return {
+    pay: studentPays,
+    text: studentPays === 0 ? 'Full Waiver (Low Fee)' : 'Partial (Govt pays ₹35k)',
+    isFree: studentPays === 0
+  };
 }
 
 // ── Rank Prediction & Fee Reimbursement ───────────────────────
@@ -457,13 +517,15 @@ function calculateRankAndReimbursement() {
     const predBox = document.getElementById('rank-prediction-display');
     const predVal = document.getElementById('predicted-rank-val');
     if (marks !== null && marks !== undefined && marks >= 0) {
-      const match = MARKS_VS_RANK.find(m => marks >= m.marks_from && marks <= m.marks_to);
-      if (match) {
-        const midRank = Math.floor((match.rank_from + match.rank_to) / 2);
-        rank = midRank;
-        state.studentRank = midRank;
-        predVal.textContent = `${midRank.toLocaleString()} (${match.notes.split('—')[0].trim()})`;
+      const estimatedRank = estimateRank(marks);
+      if (estimatedRank < 200000) {
+        rank = estimatedRank;
+        state.studentRank = estimatedRank;
+        predVal.textContent = `~${estimatedRank.toLocaleString()} (interpolated from ${marks} marks)`;
         predBox.classList.remove('hidden');
+        // Auto-populate rank input field if visible
+        const rankInput = document.getElementById('student-rank');
+        if (rankInput && !rankInput.value) rankInput.value = estimatedRank;
       } else { rank = null; predBox.classList.add('hidden'); }
     } else { rank = null; predBox?.classList.add('hidden'); }
   }
@@ -613,7 +675,7 @@ function renderStrategyGuide() {
   const tierLabel = rank <= 1000 ? 'Top Rank' : rank <= 5000 ? 'High Rank' : rank <= 15000 ? 'Mid Rank' : rank <= 40000 ? 'Average Rank' : rank <= 80000 ? 'Lower Rank' : 'Bottom Tier';
 
   container.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,var(--primary-bg),var(--secondary-bg));border-radius:var(--radius);border:1px solid rgba(255,87,34,0.15)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,var(--primary-bg),var(--secondary-bg));border-radius:var(--radius);border:1px solid rgba(123,63,242,0.15)">
       <div>
         <div style="font-size:11px;color:var(--text-muted);font-weight:700;text-transform:uppercase">Your Profile</div>
         <div style="font-size:18px;font-weight:900;color:var(--primary)">Rank #${rank.toLocaleString()} — ${tierLabel}</div>
@@ -658,24 +720,28 @@ function initPredictorFilters() {
 
   const bufferSlider = document.getElementById('rank-buffer');
   const bufferDisplay = document.getElementById('buffer-val-display');
+
+  function updateBufferTrack(val) {
+    const pct = ((val + 10000) / 20000) * 100;
+    let bg;
+    if (val === 0) {
+      bg = '#E2E8F0';
+    } else if (val > 0) {
+      bg = `linear-gradient(to right,#E2E8F0 0%,#E2E8F0 50%,#FF6A2A 50%,#FF6A2A ${pct}%,#E2E8F0 ${pct}%,#E2E8F0 100%)`;
+    } else {
+      bg = `linear-gradient(to right,#E2E8F0 0%,#E2E8F0 ${pct}%,#7B3FF2 ${pct}%,#7B3FF2 50%,#E2E8F0 50%,#E2E8F0 100%)`;
+    }
+    bufferSlider.style.setProperty('--buffer-track-bg', bg);
+  }
+
   bufferSlider.addEventListener('input', e => {
     state.rankBuffer = parseInt(e.target.value, 10);
-    bufferDisplay.textContent = state.rankBuffer > 0 ? `+${state.rankBuffer.toLocaleString()}` : '± 0';
+    bufferDisplay.textContent = state.rankBuffer > 0 ? `+${state.rankBuffer.toLocaleString()}` : state.rankBuffer < 0 ? `${state.rankBuffer.toLocaleString()}` : '± 0';
+    updateBufferTrack(state.rankBuffer);
     renderPredictor();
   });
 
-  document.getElementById('btn-view-card').addEventListener('click', () => {
-    state.viewMode = 'card';
-    document.getElementById('btn-view-card').classList.add('active');
-    document.getElementById('btn-view-table').classList.remove('active');
-    renderPredictor();
-  });
-  document.getElementById('btn-view-table').addEventListener('click', () => {
-    state.viewMode = 'table';
-    document.getElementById('btn-view-table').classList.add('active');
-    document.getElementById('btn-view-card').classList.remove('active');
-    renderPredictor();
-  });
+  // View-toggle buttons removed — predictor always uses table view.
 
   document.getElementById('btn-reset-filters').addEventListener('click', () => {
     document.getElementById('search-college').value = '';
@@ -684,6 +750,7 @@ function initPredictorFilters() {
     document.getElementById('sort-by').value = 'recommended';
     document.getElementById('rank-buffer').value = 0;
     document.getElementById('buffer-val-display').textContent = '± 0';
+    updateBufferTrack(0);
     Object.assign(state, {
       searchQuery: '', filterBranchCodes: [], filterDistrictList: [],
       filterTypeList: [], filterAffiliationList: [],
@@ -701,115 +768,97 @@ function initPredictorFilters() {
 }
 
 // ── Admission Chance Logic ─────────────────────────────────────
-function getAdmissionChance(rank, cutoff, buffer = 0) {
+
+// Returns a multiplier applied to 2025 cutoff to project 2026.
+// factor < 1 = cutoff rank falls (more competitive); factor > 1 = opens up.
+// isGovt: govt/univ seats are demand-rigid — dampens extreme market swings by 5%.
+function getBranchMarketFactor(branchCode, isGovt = false) {
+  const factor = MARKET_FACTOR[branchCode] ?? 1.0;
+  return isGovt ? factor * 0.95 : factor;
+}
+
+function getAdmissionChance(rank, cutoff, buffer = 0, branchCode = null, isGovt = false) {
   if (rank === null || rank === undefined) return { level: 'Enter Rank', class: 'na', tier: 'na', priority: 5 };
-  const effectiveRank = rank + buffer;
   if (!cutoff) return { level: 'Reach', class: 'low', tier: 'reach', priority: 4 };
 
-  const ratio = effectiveRank / cutoff;
-  if (ratio <= 0.80)  return { level: 'Safe Pick',   class: 'high',   tier: 'safe',       priority: 1 };
-  if (ratio <= 1.00)  return { level: 'Good Bet',    class: 'medium', tier: 'likely',     priority: 2 };
-  if (ratio <= 1.15)  return { level: 'Borderline',  class: 'dream',  tier: 'borderline', priority: 3 };
-  return               { level: 'Reach',             class: 'low',    tier: 'reach',      priority: 4 };
+  const effectiveRank = rank + buffer;
+  const factor = branchCode ? getBranchMarketFactor(branchCode, isGovt) : 1.0;
+  const est2026 = Math.min(MAX_QUALIFYING_RANK, Math.max(1, Math.round(cutoff * factor)));
+  const ratio = effectiveRank / est2026;
+
+  if (ratio <= 0.80) return { level: 'Safe Pick',  class: 'high',   tier: 'safe',       priority: 1 };
+  if (ratio <= 1.00) return { level: 'Good Bet',   class: 'medium', tier: 'likely',     priority: 2 };
+  if (ratio <= 1.15) return { level: 'Borderline', class: 'dream',  tier: 'borderline', priority: 3 };
+  return              { level: 'Reach',             class: 'low',    tier: 'reach',      priority: 4 };
 }
 
 // ── 2026 Allotment Probability Predictor ──────────────────────
-// Uses 2025 final cutoffs + branch-level year-over-year trend (derived from
-// 2022-2025 EAPCET historical data) to estimate the 2026 cutoff, then maps
-// the student's rank against that estimate to a probability band.
-//
-// Key 2026 context: total qualified candidates ~1.82 lakh (≈+3% vs 2025);
-// AI/ML/DS branches saw highest demand surge; core CS +5%; ECE +3%; non-CS ≈ flat.
-function get2026Probability(rank, cutoff2025, branchCode) {
+// Uses 2025 final cutoffs + market demand tier factors to estimate the 2026
+// cutoff, then maps the student's rank against that estimate via an S-curve.
+function get2026Probability(rank, cutoff2025, branchCode, isGovt = false) {
   if (!rank || !cutoff2025) return null;
 
-  // YoY cutoff shift by branch type (positive = cutoff rank number goes UP = harder)
-  const trendMap = {
-    'CS-AI': 0.07, 'CS-DS': 0.07, 'CS-ML': 0.07, 'AIML': 0.07, 'AIDS': 0.07,
-    'CS':    0.05, 'IT':    0.05, 'CS-CY': 0.05, 'CS-IOT': 0.05,
-    'EC':    0.03, 'AE':    0.02,
-    'EE':    0.01, 'ME':    0.01, 'CE':    0.01,
-    'CH':    0.01, 'BT':    0.01, 'PHM':   0.01,
-  };
-  const trendPct = trendMap[branchCode] ?? 0.03;
-  const est2026 = Math.round(cutoff2025 * (1 + trendPct));
-  const ratio = rank / est2026;
+  const factor  = getBranchMarketFactor(branchCode, isGovt);
+  const est2026 = Math.min(MAX_QUALIFYING_RANK, Math.max(1, Math.round(cutoff2025 * factor)));
+  const trendPct = factor - 1; // negative = tightening, positive = expanding
+  const ratio   = rank / est2026;
 
   let probability, label, cls;
-  if      (ratio <= 0.70) { probability = 92; label = 'Very High'; cls = 'prob-vh'; }
-  else if (ratio <= 0.85) { probability = 80; label = 'High';      cls = 'prob-h';  }
-  else if (ratio <= 1.00) { probability = 63; label = 'Moderate';  cls = 'prob-m';  }
-  else if (ratio <= 1.10) { probability = 38; label = 'Low';       cls = 'prob-l';  }
-  else if (ratio <= 1.25) { probability = 18; label = 'Very Low';  cls = 'prob-vl'; }
+  if      (ratio <= 0.75) { probability = 96; label = 'Very High'; cls = 'prob-vh'; }
+  else if (ratio <= 0.92) { probability = 88; label = 'Very High'; cls = 'prob-vh'; }
+  else if (ratio <= 1.00) { probability = 74; label = 'High';      cls = 'prob-h';  }
+  else if (ratio <= 1.09) { probability = 48; label = 'Moderate';  cls = 'prob-m';  }
+  else if (ratio <= 1.18) { probability = 22; label = 'Low';       cls = 'prob-l';  }
   else                    { probability =  5; label = 'Unlikely';  cls = 'prob-vl'; }
 
   return { probability, label, cls, est2026, trendPct };
 }
 
-function getRecommendedScore(college) {
-  // METRIC PLAN v4 — Demand-aware student ROI scoring (June 2026)
-  // Weights: cutoffDemand 30% | avg_pkg 30% | NAAC 15% | NIRF 10% | type 10% | highest_pkg 5%
-  // Cutoff demand: CSE/CSD OC-BOYS final-phase rank as a revealed-preference prestige signal.
-  //   Lower rank = harder to get in = college is more sought-after = higher score.
-  //   This fixes colleges with no NIRF/NAAC data but strong real-world demand (e.g. MVSR).
+// cutoffHint: pre-resolved branch cutoff from call site; falls back to CSE/best-branch lookup.
+// Returns additive score 0-100. GOV/UNIV/SF colleges receive a hard structural advantage.
+function getRecommendedScore(college, cutoffHint = null) {
+  let score = 0;
 
-  // 1. Cutoff demand — CSE preferred, then CSD/CSI/CSM/CSC/CS, then best (lowest) branch overall
-  const CS_PRIORITY = ['CSE', 'CSD', 'CSI', 'CSC', 'CSM', 'CS'];
-  let refBranch = null;
-  for (const code of CS_PRIORITY) {
-    refBranch = college.branches?.find(b => b.code === code);
-    if (refBranch) break;
+  // Factor 1: Government/University structural preference (hard baseline bias)
+  score += GOVERNMENT_ADJACENT_TYPES.includes(college.type) ? 40 : 10;
+
+  // Factor 2: Market demand via cutoff rank (revealed-preference prestige signal)
+  let refCutoff = cutoffHint;
+  if (!refCutoff) {
+    const CS_PRIORITY = ['CSE', 'CSD', 'CSI', 'CSC', 'CSM', 'CS'];
+    let refBranch = null;
+    for (const code of CS_PRIORITY) {
+      refBranch = college.branches?.find(b => b.code === code);
+      if (refBranch) break;
+    }
+    if (!refBranch) {
+      refBranch = [...(college.branches || [])]
+        .filter(b => b.cutoffs?.['OC BOYS'])
+        .sort((a, b) => a.cutoffs['OC BOYS'] - b.cutoffs['OC BOYS'])[0] || null;
+    }
+    refCutoff = refBranch?.cutoffs?.['OC BOYS'] || 0;
   }
-  if (!refBranch) {
-    refBranch = [...(college.branches || [])]
-      .filter(b => b.cutoffs?.['OC BOYS'])
-      .sort((a, b) => a.cutoffs['OC BOYS'] - b.cutoffs['OC BOYS'])[0] || null;
-  }
-  const refCutoff = refBranch?.cutoffs?.['OC BOYS'] || 0;
-  const cutoffScore = !refCutoff       ? 0
-    : refCutoff <=  1000 ? 10
-    : refCutoff <=  3000 ? 9.5
-    : refCutoff <=  5000 ? 9
-    : refCutoff <=  8000 ? 8.5
-    : refCutoff <= 12000 ? 8
-    : refCutoff <= 18000 ? 7
-    : refCutoff <= 25000 ? 6
-    : refCutoff <= 35000 ? 5
-    : refCutoff <= 50000 ? 4
-    : refCutoff <= 70000 ? 3
-    : 1.5;
+  if      (refCutoff <  5000) score += 30;
+  else if (refCutoff < 15000) score += 20;
+  else if (refCutoff < 40000) score += 10;
 
-  // 2. NAAC grade
-  const naacMap = { 'A++': 10, 'A+': 8, 'NAAC A+': 8, 'A': 6, 'NAAC A': 6, 'B++': 4, 'B+': 3, 'B': 2 };
-  const naacScore = naacMap[college.naac] ?? 0;
+  // Factor 3: NAAC accreditation
+  const naacGrade = (college.naac || '').trim().toUpperCase();
+  if      (naacGrade === 'A++') score += 20;
+  else if (naacGrade === 'A+' || naacGrade === 'NAAC A+') score += 15;
+  else if (naacGrade === 'A'  || naacGrade === 'NAAC A')  score += 10;
+  else if (naacGrade === 'B++') score += 5;
 
-  // 3. Avg package — median salary outcome for the typical graduate
-  const pkg = college.avg_pkg || 0;
-  const pkgScore = pkg >= 12 ? 10 : pkg >= 10 ? 9.5 : pkg >= 9.5 ? 9 : pkg >= 8.5 ? 8.5
-    : pkg >= 7.5 ? 8 : pkg >= 6.5 ? 7 : pkg >= 5.5 ? 6 : pkg >= 5 ? 5
-    : pkg >= 4 ? 4 : pkg >= 3 ? 2 : 1;
+  // Factor 4: Placement consistency — direct LPA value, capped at 15 points
+  score += Math.min(parseFloat(college.avg_pkg) || 0, 15);
 
-  // 4. Highest package — ceiling signals top-company recruitment reach
-  const hpkg = college.highest_pkg || 0;
-  const highestPkgScore = hpkg >= 40 ? 10 : hpkg >= 30 ? 9 : hpkg >= 20 ? 8 : hpkg >= 15 ? 7
-    : hpkg >= 10 ? 6 : hpkg >= 8 ? 4 : hpkg >= 6 ? 2 : 1;
-
-  // 5. NIRF 2025 — holistic 5-parameter ranking (TLR, Research, GO, Outreach, Perception)
-  const nirfMap = { '1-50': 10, '51-100': 9, '101-150': 8, '151-200': 7, '201-300': 5, '301-500': 3 };
-  const nirfScore = nirfMap[college.nirf_band] ?? 0;
-
-  // 6. Type — GOV/UNIV = subsidised fees + govt accountability
-  const isGovtOrUniv = college.type === 'GOV' || college.type === 'UNIV';
-  const typeScore = isGovtOrUniv ? 10 : 5;
-
-  return (cutoffScore * 0.30) + (pkgScore * 0.30) + (naacScore * 0.15)
-       + (nirfScore * 0.10) + (typeScore * 0.10) + (highestPkgScore * 0.05);
+  return Math.min(100, parseFloat(score.toFixed(2)));
 }
 
 function getQualityTier(score) {
-  if (score >= 8.0) return 'elite';
-  if (score >= 5.5) return 'premier';
-  if (score >= 3.0) return 'good';
+  if (score >= 80) return 'elite';
+  if (score >= 55) return 'premier';
+  if (score >= 30) return 'good';
   return 'standard';
 }
 
@@ -867,6 +916,52 @@ function getCgKey() {
   return `${state.category} ${genderKey}`;
 }
 
+// ── College Rankings Panel ─────────────────────────────────────
+// Shows ALL colleges ranked by recommendedScore, independent of student rank.
+// Re-renders when gender or category changes (affects filtering / score context).
+function renderCollegeRanking() {
+  const container = document.getElementById('college-ranking-container');
+  if (!container) return;
+
+  const genderKey = state.gender === 'GENERAL' ? 'BOYS' : state.gender;
+
+  // Score every college (no rank filter)
+  const ranked = COLLEGES
+    .filter(c => !(state.gender === 'BOYS' && c.coed === 'GIRLS'))
+    .map(c => ({ c, score: getRecommendedScore(c), tier: '' }))
+    .sort((a, b) => b.score - a.score);
+
+  container.innerHTML = '';
+
+  ranked.forEach(({ c, score }, idx) => {
+    const tier = getQualityTier(score);
+    const typeIsGovt = GOVERNMENT_ADJACENT_TYPES.includes(c.type);
+    const naacBadge = (c.naac && c.naac !== 'N/A')
+      ? `<span class="tag-badge naac" style="font-size:8px;padding:1px 5px">NAAC ${c.naac}</span>` : '';
+    const typeBadge = `<span class="tag-badge ${typeIsGovt ? 'govt' : 'pvt'}" style="font-size:8px;padding:1px 5px">${c.type}</span>`;
+    const nirfBadge = c.nirf_band
+      ? `<span class="tag-badge nirf-band" style="font-size:8px;padding:1px 5px">NIRF ${c.nirf_band}</span>` : '';
+    const pkgText = c.avg_pkg ? `${c.avg_pkg} LPA` : '—';
+    const feeText = c.fee_1yr ? `₹${Math.round(c.fee_1yr / 1000)}k/yr` : '—';
+    const tierClass = tier === 'elite' ? 'ranking-score-elite' : tier === 'premier' ? 'ranking-score-premier' : 'ranking-score-good';
+
+    const card = document.createElement('div');
+    card.className = 'ranking-card';
+    card.title = `Click to view details`;
+    card.innerHTML = `
+      <div class="ranking-card-rank">#${idx + 1}</div>
+      <div class="ranking-card-body">
+        <div class="ranking-card-name">${c.name}</div>
+        <div class="ranking-card-meta">${c.code} · ${c.district} · Pkg: ${pkgText} · Fee: ${feeText}</div>
+        <div class="ranking-card-badges">${typeBadge}${naacBadge}${nirfBadge}</div>
+      </div>
+      <div class="ranking-card-score ${tierClass}">${score}</div>
+    `;
+    card.addEventListener('click', () => openCollegeModal(c.code));
+    container.appendChild(card);
+  });
+}
+
 let _lastTrackedRank = null;
 function renderPredictor() {
   const container  = document.getElementById('predictions-container');
@@ -904,27 +999,43 @@ function renderPredictor() {
     if (state.filterHostel && c.hostel !== 'Yes') return null;
     if (state.filterNaac && !c.naac.includes('A')) return null;
 
+    const isGovtPriority = GOVERNMENT_ADJACENT_TYPES.includes(c.type);
+
     const matchedBranches = c.branches.filter(b => {
       if (state.filterBranchCodes.length === 0) return true;
       return state.filterBranchCodes.includes(b.code);
     }).map(b => {
       const cutoff  = b.cutoffs[cgKey];
-      const chance  = getAdmissionChance(rank, cutoff, buffer);
+      const chance  = getAdmissionChance(rank, cutoff, buffer, b.code, isGovtPriority);
       const trend   = getTrendIndicator(b, cgKey);
-      const prob2026 = get2026Probability(rank, cutoff, b.code);
+      const prob2026 = get2026Probability(rank, cutoff, b.code, isGovtPriority);
       return { ...b, cutoff, chance, trend, prob2026 };
     });
 
     if (matchedBranches.length === 0) return null;
     const bestPriority = Math.min(...matchedBranches.map(b => b.chance.priority));
-    const recScore = getRecommendedScore(c);
-    return { ...c, branches: matchedBranches, bestChancePriority: bestPriority, recommendedScore: recScore, qualityTier: getQualityTier(recScore) };
+    const bestCutoff = Math.min(...matchedBranches.map(b => b.cutoff || 999999));
+    const recScore = getRecommendedScore(c, bestCutoff < 999999 ? bestCutoff : null);
+    const financials = calculateFees(c.fee_1yr, rank, cgKey);
+    return { ...c, branches: matchedBranches, bestChancePriority: bestPriority, recommendedScore: recScore, qualityTier: getQualityTier(recScore), isGovtPriority, financials };
   }).filter(Boolean);
 
   // Sort
   filteredColleges.sort((a, b) => {
-    if (state.sortBy === 'recommended') return b.recommendedScore - a.recommendedScore;
-    if (state.sortBy === 'chance')   return a.bestChancePriority - b.bestChancePriority;
+    if (state.sortBy === 'recommended') {
+      // Branch First: Reach → Borderline → Good Bet → Safe Pick
+      // Mirrors real counseling option-entry order — system allocates best seat from top down
+      if (state.preferenceMode === 'branch') {
+        if (a.bestChancePriority !== b.bestChancePriority) return b.bestChancePriority - a.bestChancePriority;
+        return b.recommendedScore - a.recommendedScore;
+      }
+      return b.recommendedScore - a.recommendedScore;
+    }
+    if (state.sortBy === 'chance') {
+      if (a.bestChancePriority !== b.bestChancePriority) return a.bestChancePriority - b.bestChancePriority;
+      if (a.isGovtPriority !== b.isGovtPriority) return a.isGovtPriority ? -1 : 1; // GOV/UNIV/SF before PVT
+      return b.recommendedScore - a.recommendedScore;
+    }
     if (state.sortBy === 'fee')      return (a.fee_1yr||999999) - (b.fee_1yr||999999);
     if (state.sortBy === 'package')  return (b.avg_pkg||0) - (a.avg_pkg||0);
     if (state.sortBy === 'naac') {
@@ -943,9 +1054,12 @@ function renderPredictor() {
   const modeTag = state.preferenceMode === 'college'
     ? ` · <strong style="color:var(--primary)">🏛 College First</strong>`
     : ` · <strong style="color:var(--secondary)">📚 Branch First</strong>`;
+  const reachFirstNote = (state.preferenceMode === 'branch' && state.sortBy === 'recommended')
+    ? ` · <span style="color:var(--text-muted);font-size:11px">Reach → Safe (option entry order)</span>`
+    : '';
   const label = useSplitView
-    ? `Showing ${matchCount} options — split by branch priority${modeTag}`
-    : `Showing ${matchCount} options across ${filteredColleges.length} colleges${modeTag}`;
+    ? `Showing ${matchCount} options — split by branch priority${modeTag}${reachFirstNote}`
+    : `Showing ${matchCount} options across ${filteredColleges.length} colleges${modeTag}${reachFirstNote}`;
   countText.innerHTML = label;
 
   // caution message — hide in branch-first split, show otherwise (unless branch filter set)
@@ -957,14 +1071,11 @@ function renderPredictor() {
     return;
   }
 
-  if (useSplitView && state.viewMode === 'table') {
+  // Predictor always renders as table. Branch-first split gets its own table layout.
+  if (useSplitView) {
     renderSplitBranchTableView(container, filteredColleges, cgKey);
-  } else if (useSplitView) {
-    renderSplitBranchView(container, filteredColleges);
-  } else if (state.viewMode === 'table') {
-    renderTableView(container, filteredColleges, cgKey);
   } else {
-    renderCardView(container, filteredColleges);
+    renderTableView(container, filteredColleges, cgKey);
   }
 }
 
@@ -1118,7 +1229,7 @@ function renderQualityCardView(container, colleges) {
 function buildCollegeCard(c, rank = null) {
   const card = document.createElement('div');
   const bestTier = c.branches[0]?.chance?.tier || 'reach';
-  card.className = `college-card glass-panel tier-${bestTier}`;
+  card.className = `college-card glass-panel tier-${bestTier}${c.isGovtPriority ? ' govt-priority-card' : ''}`;
 
   const inCompare = state.compareList.includes(c.code);
   const feeStr = c.fee_1yr ? `₹${c.fee_1yr.toLocaleString()}/yr` : 'N/A';
@@ -1129,6 +1240,11 @@ function buildCollegeCard(c, rank = null) {
   if (c.naac && c.naac !== 'N/A') badgesHtml += `<span class="tag-badge naac">NAAC ${c.naac}</span>`;
   if (c.nirf_band) badgesHtml += `<span class="tag-badge nirf-band">NIRF ${c.nirf_band}</span>`;
   if (c.hostel === 'Yes') badgesHtml += `<span class="tag-badge hostel">Hostel</span>`;
+  if (c.financials?.isFree) {
+    badgesHtml += `<span class="tag-badge fee-free">✅ ZERO FEE</span>`;
+  } else if (c.financials?.pay > 0) {
+    badgesHtml += `<span class="tag-badge fee-pay">⚠️ You Pay ₹${c.financials.pay.toLocaleString()}</span>`;
+  }
 
   const displayBranches = c.branches.slice(0, 4);
   let branchesHtml = displayBranches.map(b => `
@@ -1221,34 +1337,90 @@ function renderCompare() {
     return;
   }
   const cols = COLLEGES.filter(c => state.compareList.includes(c.code));
-  const table = document.createElement('table');
-  table.className = 'compare-table';
-  let headHtml = '<tr><th>Feature</th>';
-  cols.forEach(c => { headHtml += `<th class="college-header"><span class="college-code-badge">${c.code}</span><div style="margin-top:4px;font-size:12px">${c.name}</div><button type="button" class="remove-comp-btn" data-remove-code="${c.code}">Remove</button></th>`; });
-  headHtml += '</tr>';
-  const rows = [
-    { label:'Location',       fmt: c => `${c.place}, ${c.district}` },
-    { label:'Type',           fmt: c => c.type },
-    { label:'Affiliation',    fmt: c => c.affiliation },
-    { label:'NAAC Grade',     fmt: c => c.naac || 'N/A' },
-    { label:'Estd. Year',     fmt: c => c.estd || 'N/A' },
-    { label:'Hostel',         fmt: c => c.hostel || 'N/A' },
-    { label:'1-Year Fee',     fmt: c => c.fee_1yr ? `₹${c.fee_1yr.toLocaleString()}` : 'N/A' },
-    { label:'Total B.Tech Fee', fmt: c => c.fee_total ? `₹${c.fee_total.toLocaleString()}` : 'N/A' },
-    { label:'Avg Placement',  fmt: c => c.avg_pkg ? `${c.avg_pkg} LPA` : 'N/A' },
-    { label:'Highest Pkg',    fmt: c => c.highest_pkg ? `${c.highest_pkg} LPA` : 'N/A' },
-    { label:'Recruiters',     fmt: c => c.recruiters || 'N/A' },
-    { label:'Branches',       fmt: c => c.branches.map(b=>b.code).sort().join(', ') }
+
+  const COMPARE_ROWS = [
+    { label: 'Location',    fmt: c => `${c.place}, ${c.district}` },
+    { label: 'Type',        fmt: c => c.type },
+    { label: 'Affiliation', fmt: c => c.affiliation },
+    { label: 'NAAC',        fmt: c => c.naac || 'N/A' },
+    { label: 'Estd.',       fmt: c => c.estd || 'N/A' },
+    { label: 'Hostel',      fmt: c => c.hostel || 'N/A' },
+    { label: '1-Yr Fee',    fmt: c => c.fee_1yr   ? `₹${c.fee_1yr.toLocaleString()}`   : 'N/A' },
+    { label: 'Total Fee',   fmt: c => c.fee_total  ? `₹${c.fee_total.toLocaleString()}`  : 'N/A' },
+    { label: 'Avg Pkg',     fmt: c => c.avg_pkg    ? `${c.avg_pkg} LPA`    : 'N/A' },
+    { label: 'Top Pkg',     fmt: c => c.highest_pkg ? `${c.highest_pkg} LPA` : 'N/A' },
+    { label: 'Recruiters',  fmt: c => c.recruiters || 'N/A' },
+    { label: 'Branches',    fmt: c => c.branches.map(b => b.code).sort().join(', ') },
   ];
-  let bodyHtml = '';
-  rows.forEach(r => {
-    bodyHtml += `<tr><td style="font-weight:700;white-space:nowrap">${r.label}</td>`;
-    cols.forEach(c => { bodyHtml += `<td>${r.fmt(c)}</td>`; });
-    bodyHtml += '</tr>';
-  });
-  table.innerHTML = headHtml + bodyHtml;
-  container.appendChild(table);
-  table.querySelectorAll('[data-remove-code]').forEach(btn => btn.addEventListener('click', () => { toggleCompare(btn.getAttribute('data-remove-code')); renderCompare(); }));
+
+  if (window.innerWidth <= 768) {
+    // ── Mobile: swipeable card-per-college view ──────────────────
+    const wrap = document.createElement('div');
+    wrap.className = 'compare-mobile-wrap';
+
+    if (cols.length > 1) {
+      const hint = document.createElement('p');
+      hint.className = 'compare-swipe-hint';
+      hint.innerHTML = '<span class="compare-swipe-arrow">←</span> Swipe to compare <span class="compare-swipe-arrow">→</span>';
+      wrap.appendChild(hint);
+    }
+
+    const scroll = document.createElement('div');
+    scroll.className = 'compare-cards-scroll';
+
+    cols.forEach(c => {
+      const card = document.createElement('div');
+      card.className = 'compare-card-mobile';
+
+      let html = `
+        <div class="ccm-header">
+          <div class="ccm-name">${c.name}</div>
+          <span class="ccm-code">${c.code}</span>
+        </div>`;
+
+      COMPARE_ROWS.forEach(r => {
+        html += `<div class="ccm-row">
+          <span class="ccm-label">${r.label}</span>
+          <span class="ccm-val">${r.fmt(c)}</span>
+        </div>`;
+      });
+
+      html += `<button type="button" class="ccm-remove" data-remove-code="${c.code}">Remove</button>`;
+      card.innerHTML = html;
+      scroll.appendChild(card);
+    });
+
+    wrap.appendChild(scroll);
+    container.appendChild(wrap);
+
+    wrap.querySelectorAll('[data-remove-code]').forEach(btn =>
+      btn.addEventListener('click', () => { toggleCompare(btn.getAttribute('data-remove-code')); renderCompare(); })
+    );
+  } else {
+    // ── Desktop / Tablet: comparison table ───────────────────────
+    const table = document.createElement('table');
+    table.className = 'compare-table';
+
+    let headHtml = '<tr><th>Feature</th>';
+    cols.forEach(c => {
+      headHtml += `<th class="college-header"><span class="college-code-badge">${c.code}</span><div style="margin-top:4px;font-size:12px">${c.name}</div><button type="button" class="remove-comp-btn" data-remove-code="${c.code}">Remove</button></th>`;
+    });
+    headHtml += '</tr>';
+
+    let bodyHtml = '';
+    COMPARE_ROWS.forEach(r => {
+      bodyHtml += `<tr><td style="font-weight:700;white-space:nowrap">${r.label}</td>`;
+      cols.forEach(c => { bodyHtml += `<td>${r.fmt(c)}</td>`; });
+      bodyHtml += '</tr>';
+    });
+
+    table.innerHTML = headHtml + bodyHtml;
+    container.appendChild(table);
+
+    table.querySelectorAll('[data-remove-code]').forEach(btn =>
+      btn.addEventListener('click', () => { toggleCompare(btn.getAttribute('data-remove-code')); renderCompare(); })
+    );
+  }
 }
 
 // ── Option Form Simulator ──────────────────────────────────────
@@ -1693,7 +1865,7 @@ function openCollegeModal(collegeCode) {
 
   const branchRows = college.branches.map(b => {
     const cutoff = b.cutoffs[cgKey];
-    const chance = getAdmissionChance(rank, cutoff, state.rankBuffer);
+    const chance = getAdmissionChance(rank, cutoff, state.rankBuffer, b.code);
     const p1 = b.cutoffs_p1?.[cgKey];
     const p2 = b.cutoffs_p2?.[cgKey];
     const seats = b.seats;
@@ -1709,7 +1881,7 @@ function openCollegeModal(collegeCode) {
   }).join('');
 
   const websiteHtml = college.website
-    ? `<a href="${college.website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--secondary);font-weight:700;text-decoration:none;padding:6px 12px;border:1.5px solid rgba(255,87,34,0.3);border-radius:6px;margin-bottom:14px">
+    ? `<a href="${college.website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--secondary);font-weight:700;text-decoration:none;padding:6px 12px;border:1.5px solid rgba(123,63,242,0.3);border-radius:8px;margin-bottom:14px">
         <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         Visit Official Website ↗
        </a>`
@@ -1776,14 +1948,21 @@ function syncPredictorToOptionForm() {
     const branches = c.branches.filter(b => {
       if (state.filterBranchCodes.length === 0) return true;
       return state.filterBranchCodes.includes(b.code);
-    }).map(b => ({ ...b, cutoff: b.cutoffs?.[cgKey] || 0, chance: getAdmissionChance(rank, b.cutoffs?.[cgKey], buffer) }));
+    }).map(b => ({ ...b, cutoff: b.cutoffs?.[cgKey] || 0, chance: getAdmissionChance(rank, b.cutoffs?.[cgKey], buffer, b.code) }));
 
     if (branches.length === 0) return null;
     return { ...c, branches, recommendedScore: getRecommendedScore(c) };
   }).filter(Boolean);
 
-  // Sort colleges by recommended score (descending) — both modes start from this base
-  filtered.sort((a, b) => (b.recommendedScore || 0) - (a.recommendedScore || 0));
+  // Sort colleges: Branch First uses Reach→Safe (counseling entry order, system picks best from top).
+  // College First uses quality-score descending.
+  filtered.sort((a, b) => {
+    if (state.preferenceMode === 'branch') {
+      if (a.bestChancePriority !== b.bestChancePriority) return b.bestChancePriority - a.bestChancePriority;
+      return (b.recommendedScore || 0) - (a.recommendedScore || 0);
+    }
+    return (b.recommendedScore || 0) - (a.recommendedScore || 0);
+  });
 
   const newOptions = [];
 
@@ -2457,8 +2636,12 @@ function printOptionForm() {
 
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>TS-EAPCET Option Form</title>
-    <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h2{margin-bottom:4px}p{margin:2px 0;font-size:13px}table{border-collapse:collapse;width:100%;margin-top:16px;font-size:13px}th{background:#222;color:#fff;padding:8px 10px;border:1px solid #ccc;text-align:left}tr:nth-child(even){background:#f5f5f5}@media print{button{display:none}}</style>
+    <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h2{margin-bottom:4px}p{margin:2px 0;font-size:13px}table{border-collapse:collapse;width:100%;margin-top:16px;font-size:13px}th{background:#222;color:#fff;padding:8px 10px;border:1px solid #ccc;text-align:left}tr:nth-child(even){background:#f5f5f5}.print-bar{display:flex;align-items:center;gap:12px;margin-bottom:14px}@media print{.print-bar{display:none}}</style>
   </head><body>
+    <div class="print-bar">
+      <button onclick="window.print()" style="padding:8px 20px;background:#FF5722;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🖨 Print</button>
+      <span style="font-size:12px;color:#666">TS-EAPCET 2026 Option Form — ${state.optionList.length} options</span>
+    </div>
     <h2>TS-EAPCET 2026 — My Option Form</h2>
     <p>Rank: <strong>${state.studentRank ? '#' + state.studentRank.toLocaleString() : 'Not entered'}</strong> &nbsp;|&nbsp; Category: <strong>${state.category}</strong> &nbsp;|&nbsp; Gender: <strong>${state.gender}</strong></p>
     <p style="font-size:11px;color:#666">Cutoffs are from 2025 Final Phase (${cgKey}). Verify before submission.</p>
@@ -2467,20 +2650,62 @@ function printOptionForm() {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:16px;font-size:11px;color:#888">Generated by MarsMate EAPCET · ${new Date().toLocaleDateString('en-IN')}</p>
-    <button onclick="window.print()" style="margin-top:12px;padding:8px 20px;background:#FF5722;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🖨 Print</button>
   </body></html>`);
   win.document.close();
 }
 
 function shareOptionFormWhatsApp() {
   if (state.optionList.length === 0) { alert('Add at least one option before sharing.'); return; }
-  const lines = state.optionList.map((item, i) => {
+  const cgKey = getCgKey();
+
+  // Build CSV rows
+  const headers = ['Priority', 'College Code', 'College Name', 'Branch Code', 'Branch Name',
+    'Cutoff 2025 (Final)', 'Phase 1 Cutoff', 'Phase 2 Cutoff', 'District', 'Fee / yr (₹)', 'Avg Package (LPA)'];
+
+  const rows = state.optionList.map((item, i) => {
     const college = COLLEGES.find(c => c.code === item.collegeCode);
-    const name = college ? college.name.replace(/\n/g,' ').trim() : item.collegeCode;
-    return `${i + 1}. ${item.collegeCode}-${item.branchCode} | ${name}`;
+    const branch  = college?.branches.find(b => b.code === item.branchCode);
+    const cutoff  = branch?.cutoffs?.[cgKey] ?? '';
+    const p1      = branch?.cutoffs_p1?.[cgKey] ?? '';
+    const p2      = branch?.cutoffs_p2?.[cgKey] ?? '';
+    return [
+      i + 1,
+      item.collegeCode,
+      (college?.name ?? item.collegeCode).replace(/\n/g, ' ').trim(),
+      item.branchCode,
+      (branch?.name ?? item.branchCode).replace(/\n/g, ' ').trim(),
+      cutoff,
+      p1,
+      p2,
+      college?.district ?? '',
+      college?.fee_1yr ?? '',
+      college?.avg_pkg ?? ''
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
   });
-  const text = `*My TS-EAPCET 2026 Option Form*\nRank: ${state.studentRank ? '#' + state.studentRank.toLocaleString() : 'N/A'} | Cat: ${state.category} | ${state.gender}\n\n${lines.join('\n')}\n\n_Generated via MarsMate EAPCET_`;
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+
+  // Metadata rows at top
+  const meta = [
+    `"TS-EAPCET 2026 — My Option Form"`,
+    `"Rank: ${state.studentRank ? '#' + state.studentRank.toLocaleString() : 'Not entered'} | Category: ${state.category} | Gender: ${state.gender} | Region: ${state.region}"`,
+    `"Generated by MarsMate EAPCET on ${new Date().toLocaleDateString('en-IN')}"`,
+    '',
+    headers.map(h => `"${h}"`).join(','),
+    ...rows
+  ];
+
+  // UTF-8 BOM so Excel reads accented chars correctly
+  const csvContent = '﻿' + meta.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href     = url;
+  link.download = `EAPCET_Option_Form_${state.studentRank ?? 'Rank'}_${state.category}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  track('shares');
 }
 
 // ── Preference Mode ───────────────────────────────────────────
@@ -3052,31 +3277,38 @@ function initSetupWizard() {
 function updateMobileProfileBar() {
   if (window.innerWidth > 768) return;
 
-  const rank     = state.studentRank;
+  const IC = {
+    rank:     `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="flex-shrink:0"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>`,
+    gender:   `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="flex-shrink:0"><circle cx="12" cy="11" r="4"/><path d="M12 15v6M9 18h6"/></svg>`,
+    category: `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    region:   `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+    income:   `<svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" style="flex-shrink:0"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`
+  };
+
   const rankChip = document.getElementById('chip-rank');
   if (rankChip) {
-    if (rank) {
-      rankChip.textContent = `#${rank.toLocaleString()}`;
+    if (state.studentRank) {
+      rankChip.innerHTML = `${IC.rank} #${state.studentRank.toLocaleString()}`;
       rankChip.classList.remove('empty-rank');
     } else {
-      rankChip.textContent = 'No Rank';
+      rankChip.innerHTML = `${IC.rank} Set Rank`;
       rankChip.classList.add('empty-rank');
     }
   }
 
   const genderMap = { GENERAL: 'All', BOYS: 'Boys', GIRLS: 'Girls' };
   const genderChip = document.getElementById('chip-gender');
-  if (genderChip) genderChip.textContent = genderMap[state.gender] || state.gender;
+  if (genderChip) genderChip.innerHTML = `${IC.gender} ${genderMap[state.gender] || state.gender}`;
 
   const catChip = document.getElementById('chip-category');
-  if (catChip) catChip.textContent = (state.category || 'OC').replace('_', '-');
+  if (catChip) catChip.innerHTML = `${IC.category} ${(state.category || 'OC').replace('_', '-')}`;
 
   const regChip = document.getElementById('chip-region');
-  if (regChip) regChip.textContent = state.region === 'OU' ? 'OU Area' : 'Non-Local';
+  if (regChip) regChip.innerHTML = `${IC.region} ${state.region === 'OU' ? 'OU' : 'Non-Local'}`;
 
   const incomeMap = { below: '< ₹2L', above: '₹2–8L', high: '> ₹8L' };
   const incomeChip = document.getElementById('chip-income');
-  if (incomeChip) incomeChip.textContent = incomeMap[state.incomeLevel] || state.incomeLevel;
+  if (incomeChip) incomeChip.innerHTML = `${IC.income} ${incomeMap[state.incomeLevel] || '< ₹2L'}`;
 }
 
 /* Show/hide the right FAB bar based on the current active tab */
@@ -3113,19 +3345,53 @@ function initFabBar() {
   });
 }
 
-/* Mobile "Filters" toggle: collapse/expand the advanced filter row */
+/* Mobile "Filters" toggle: collapse/expand the advanced filter row.
+   On ≤768px the section becomes a fixed bottom sheet with a backdrop. */
 function initMobileFiltersToggle() {
   const toggleBtn = document.getElementById('mobile-filters-toggle');
   const section   = document.getElementById('advanced-filters-section');
+  const closeBtn  = document.getElementById('filter-sheet-close');
   if (!toggleBtn || !section) return;
 
-  toggleBtn.addEventListener('click', () => {
-    const isOpen = section.classList.toggle('filters-open');
-    toggleBtn.classList.toggle('active', isOpen);
-    toggleBtn.setAttribute('aria-expanded', String(isOpen));
+  // Create backdrop element once
+  let backdrop = document.getElementById('filter-sheet-backdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'filter-sheet-backdrop';
+    backdrop.className = 'filter-sheet-backdrop';
+    document.body.appendChild(backdrop);
+  }
+
+  const openFilters = () => {
+    section.classList.add('filters-open');
+    toggleBtn.classList.add('active');
+    toggleBtn.setAttribute('aria-expanded', 'true');
     const label = document.getElementById('mobile-filters-toggle-label');
-    if (label) label.textContent = isOpen ? 'Hide Filters' : 'Filters';
+    if (label) label.textContent = 'Hide Filters';
+    if (window.innerWidth <= 768) backdrop.classList.add('visible');
+  };
+
+  const closeFilters = () => {
+    section.classList.remove('filters-open');
+    toggleBtn.classList.remove('active');
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    const label = document.getElementById('mobile-filters-toggle-label');
+    if (label) label.textContent = 'Filters';
+    backdrop.classList.remove('visible');
+  };
+
+  toggleBtn.addEventListener('click', () => {
+    section.classList.contains('filters-open') ? closeFilters() : openFilters();
   });
+
+  // Close via backdrop tap or the in-sheet ✕ button
+  backdrop.addEventListener('click', closeFilters);
+  closeBtn?.addEventListener('click', closeFilters);
+
+  // Close sheet on resize to desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) backdrop.classList.remove('visible');
+  }, { passive: true });
 }
 
 /* Chips: tap any chip to open the profile drawer */
