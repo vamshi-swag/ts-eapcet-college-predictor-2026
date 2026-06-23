@@ -145,6 +145,21 @@ body {
 }
 
 .brand { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.brand-btns { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-top: 8px; }
+
+.help-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; flex-shrink: 0;
+  background: rgba(123,63,242,0.08);
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  color: var(--secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative; /* anchor for .guide-new-badge */
+}
+.help-icon-btn:hover  { background: var(--secondary-bg); }
+.help-icon-btn:active { background: var(--secondary-bg); }
 .logo { display: flex; align-items: center; gap: 10px; }
 .logo-icon { color: var(--primary); }
 .logo-text { font-size: clamp(14px, 1.8vw, 18px); font-weight: 800; color: var(--text-primary); letter-spacing: -0.3px; }
@@ -975,6 +990,9 @@ button { cursor: pointer; }
     width: 100%; flex: 1; gap: 10px;
   }
 
+  /* Brand action buttons: no top margin when inside flex brand bar */
+  .sidebar .brand-btns { margin-top: 0; }
+
   /* Profile + fee panel hidden in collapsed state */
   .sidebar .profile-section       { display: none; }
   .sidebar .sidebar-summary-panel { display: none; }
@@ -1022,6 +1040,14 @@ button { cursor: pointer; }
   }
   .sidebar-mobile-toggle:active { background: var(--secondary-bg); }
 
+  /* ── Brand action buttons row (help + profile) ── */
+  .brand-btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
   /* ── Full-screen profile drawer when expanded ──
      Sidebar becomes a flex-column drawer covering the screen.
      Profile fields scroll inside; fee reimbursement pins at bottom. */
@@ -1063,6 +1089,8 @@ button { cursor: pointer; }
 
   /* Hide tagline — not needed in compact sticky header */
   .sidebar-expanded .tagline { display: none !important; }
+  /* Brand-btns: no margin in the compact sticky drawer header */
+  .sidebar-expanded .brand-btns { margin-top: 0; }
 
   /* Profile fields: natural block flow, no inner scroll */
   .sidebar-expanded .profile-section {
@@ -3790,10 +3818,11 @@ button { cursor: pointer; }
 .filter-sheet-close:hover { background: var(--reach-bg); color: var(--reach-color); border-color: var(--reach-border); }
 
 @media (max-width: 768px) {
-  /* When open: pull the section out of flow and fix it to the bottom */
+  /* When open: pull the section out of flow and fix it to the bottom.
+     bottom: 0 because nav is now at the TOP (no bottom nav to clear). */
   #advanced-filters-section.filters-open {
     position: fixed !important;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: 0;
     left: 0;
     right: 0;
     z-index: 300;
@@ -3803,7 +3832,7 @@ button { cursor: pointer; }
     max-height: 72vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 6px 16px 28px;
+    padding: 6px 16px calc(20px + env(safe-area-inset-bottom, 0px));
     display: flex !important;
     flex-wrap: wrap;
     gap: 12px;
@@ -3841,6 +3870,14 @@ button { cursor: pointer; }
 @media (max-width: 380px) {
   #advanced-filters-section.filters-open .ms-filter-group,
   #advanced-filters-section.filters-open .filter-checkbox-group { width: 100%; }
+}
+
+/* When a dropdown is open inside the filter sheet, allow it to escape
+   the overflow-y:auto clip (modern browsers support :has). */
+@supports selector(:has(.x)) {
+  #advanced-filters-section.filters-open:has(.ms-panel.ms-panel-open) {
+    overflow: visible;
+  }
 }
 
 /* ══════════════════════════════════════════════

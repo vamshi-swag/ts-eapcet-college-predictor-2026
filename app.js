@@ -1,5 +1,6 @@
 import { BRANCH_REF, MARKS_VS_RANK, COLLEGES, CHECKLIST, TIMELINE } from './data.js';
 import { track, initStatsBar } from './stats.js';
+import { trackEvent } from './analytics.js';
 
 // ── Data Cleanup (runs once on load) ──────────────────────────
 {
@@ -378,10 +379,10 @@ function initTabs() {
       document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
       updateFabBar();
-      if (tabName === 'predictor')             renderPredictor();
+      if (tabName === 'predictor')             { renderPredictor();     trackEvent('predictor_opened'); }
       else if (tabName === 'colleges')         renderCollegeRanking();
       else if (tabName === 'option-simulator') renderSimulator();
-      else if (tabName === 'compare')          renderCompare();
+      else if (tabName === 'compare')          { renderCompare();        trackEvent('compare_opened'); }
     });
   });
 }
@@ -713,7 +714,15 @@ function renderStrategyGuide() {
 
 // ── Predictor Filters ──────────────────────────────────────────
 function initPredictorFilters() {
-  document.getElementById('search-college').addEventListener('input', e => { state.searchQuery = e.target.value.toLowerCase(); renderPredictor(); });
+  let _searchTrackTimer = null;
+  document.getElementById('search-college').addEventListener('input', e => {
+    state.searchQuery = e.target.value.toLowerCase();
+    renderPredictor();
+    if (state.searchQuery.length > 1) {
+      clearTimeout(_searchTrackTimer);
+      _searchTrackTimer = setTimeout(() => trackEvent('college_searched', { query: state.searchQuery }), 800);
+    }
+  });
   document.getElementById('filter-hostel').addEventListener('change', e => { state.filterHostel = e.target.checked; renderPredictor(); });
   document.getElementById('filter-naac').addEventListener('change', e => { state.filterNaac = e.target.checked; renderPredictor(); });
   document.getElementById('sort-by').addEventListener('change', e => { state.sortBy = e.target.value; renderPredictor(); });
@@ -1555,6 +1564,7 @@ function renderSimulatorAvailable() {
       saveStateToStorage();
       renderSimulator();
       if (wasEmpty) track('optionForms');
+      trackEvent('option_added', { college: item.collegeCode, branch: item.branchCode });
     });
     container.appendChild(card);
   });
@@ -1642,6 +1652,7 @@ function runAllotmentSimulation() {
   if (!rank) { alert('Enter your EAPCET rank in the sidebar first.'); return; }
   if (state.optionList.length === 0) { alert('Add at least one preference to the option form first.'); return; }
   track('simulations');
+  trackEvent('simulation_run', { rank, optionCount: state.optionList.length, category: state.category });
 
   let allotted = null;
   let allottedIdx = -1;
@@ -2619,28 +2630,47 @@ function buildBranchCard(c, b) {
 function printOptionForm() {
   if (state.optionList.length === 0) { alert('Add at least one option before printing.'); return; }
   track('pdfDownloads');
+  trackEvent('pdf_downloaded', { optionCount: state.optionList.length, rank: state.studentRank, category: state.category });
   const cgKey = getCgKey();
   const rows = state.optionList.map((item, i) => {
     const college = COLLEGES.find(c => c.code === item.collegeCode);
     const branch  = college?.branches.find(b => b.code === item.branchCode);
     const cutoff  = branch?.cutoffs?.[cgKey];
     return `<tr>
-      <td style="padding:6px 10px;border:1px solid #ccc;text-align:center;font-weight:700">${i + 1}</td>
-      <td style="padding:6px 10px;border:1px solid #ccc">${item.collegeCode}</td>
-      <td style="padding:6px 10px;border:1px solid #ccc">${college ? college.name.replace(/\n/g,' ') : item.collegeCode}</td>
-      <td style="padding:6px 10px;border:1px solid #ccc">${item.branchCode}</td>
-      <td style="padding:6px 10px;border:1px solid #ccc">${branch ? branch.name.replace(/\n/g,' ') : item.branchCode}</td>
-      <td style="padding:6px 10px;border:1px solid #ccc;text-align:center">${cutoff ? cutoff.toLocaleString() : '—'}</td>
+      <td style="font-weight:700">${i + 1}</td>
+      <td>${item.collegeCode}</td>
+      <td>${college ? college.name.replace(/\n/g,' ') : item.collegeCode}</td>
+      <td>${item.branchCode}</td>
+      <td>${branch ? branch.name.replace(/\n/g,' ') : item.branchCode}</td>
+      <td>${cutoff ? cutoff.toLocaleString() : '—'}</td>
     </tr>`;
   }).join('');
 
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>TS-EAPCET Option Form</title>
-    <style>body{font-family:Arial,sans-serif;padding:20px;color:#000}h2{margin-bottom:4px}p{margin:2px 0;font-size:13px}table{border-collapse:collapse;width:100%;margin-top:16px;font-size:13px}th{background:#222;color:#fff;padding:8px 10px;border:1px solid #ccc;text-align:left}tr:nth-child(even){background:#f5f5f5}.print-bar{display:flex;align-items:center;gap:12px;margin-bottom:14px}@media print{.print-bar{display:none}}</style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;padding:14px;color:#000;margin:0}
+      h2{margin-bottom:4px;font-size:16px}
+      p{margin:2px 0;font-size:12px}
+      table{border-collapse:collapse;width:100%;margin-top:14px;font-size:11px;table-layout:fixed}
+      th,td{border:1px solid #ccc;padding:5px 6px;word-break:break-word}
+      th{background:#222;color:#fff;text-align:left;font-size:10px}
+      td:first-child,td:nth-child(2),td:nth-child(4),td:last-child{text-align:center;width:6%}
+      td:nth-child(2){width:9%}
+      td:nth-child(3){width:36%}
+      td:nth-child(4){width:8%}
+      td:nth-child(5){width:33%}
+      td:last-child{width:8%}
+      tr:nth-child(even){background:#f5f5f5}
+      .print-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+      @media print{.print-bar{display:none}}
+    </style>
   </head><body>
     <div class="print-bar">
-      <button onclick="window.print()" style="padding:8px 20px;background:#FF5722;color:#fff;border:none;border-radius:4px;font-size:14px;cursor:pointer">🖨 Print</button>
-      <span style="font-size:12px;color:#666">TS-EAPCET 2026 Option Form — ${state.optionList.length} options</span>
+      <button onclick="window.print()" style="padding:7px 16px;background:#FF5722;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer">🖨 Print</button>
+      <span style="font-size:11px;color:#666">TS-EAPCET 2026 Option Form — ${state.optionList.length} options</span>
     </div>
     <h2>TS-EAPCET 2026 — My Option Form</h2>
     <p>Rank: <strong>${state.studentRank ? '#' + state.studentRank.toLocaleString() : 'Not entered'}</strong> &nbsp;|&nbsp; Category: <strong>${state.category}</strong> &nbsp;|&nbsp; Gender: <strong>${state.gender}</strong></p>
@@ -3314,20 +3344,12 @@ function updateMobileProfileBar() {
 /* Show/hide the right FAB bar based on the current active tab */
 function updateFabBar() {
   const isMobile = window.innerWidth <= 768;
-  const predictorFab  = document.getElementById('fab-bar-predictor');
-  const simulatorFab  = document.getElementById('fab-bar-simulator');
-
-  if (!predictorFab || !simulatorFab) return;
-
-  predictorFab.classList.remove('fab-visible');
+  const simulatorFab = document.getElementById('fab-bar-simulator');
+  if (!simulatorFab) return;
   simulatorFab.classList.remove('fab-visible');
-
+  simulatorFab.setAttribute('aria-hidden', 'true');
   if (!isMobile) return;
-
-  if (state.activeTab === 'predictor') {
-    predictorFab.classList.add('fab-visible');
-    predictorFab.setAttribute('aria-hidden', 'false');
-  } else if (state.activeTab === 'option-simulator') {
+  if (state.activeTab === 'option-simulator') {
     simulatorFab.classList.add('fab-visible');
     simulatorFab.setAttribute('aria-hidden', 'false');
   }
@@ -3335,10 +3357,6 @@ function updateFabBar() {
 
 /* Wire FAB buttons to the same actions as the buried desktop buttons */
 function initFabBar() {
-  // FAB: Sync to Option Form (mirrors #btn-sync-to-options)
-  document.getElementById('fab-sync-options')?.addEventListener('click', () => {
-    document.getElementById('btn-sync-to-options')?.click();
-  });
   // FAB: Simulate Allotment (mirrors #btn-simulate-allotment)
   document.getElementById('fab-simulate-allotment')?.addEventListener('click', () => {
     document.getElementById('btn-simulate-allotment')?.click();
@@ -3359,7 +3377,11 @@ function initMobileFiltersToggle() {
     backdrop = document.createElement('div');
     backdrop.id = 'filter-sheet-backdrop';
     backdrop.className = 'filter-sheet-backdrop';
-    document.body.appendChild(backdrop);
+    // Append inside .main-panel so it shares the same stacking context
+    // as the filter sheet (both inside .app-container z-index:1).
+    // Appending to body would put it in the root stacking context where
+    // z-index:299 > app-container z-index:1, covering the filter sheet.
+    (document.querySelector('.main-panel') || document.body).appendChild(backdrop);
   }
 
   const openFilters = () => {
