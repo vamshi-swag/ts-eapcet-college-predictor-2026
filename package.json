@@ -1,0 +1,18 @@
+{
+  "name": "ts-eapcet-college-predictor-2026",
+  "version": "1.0.0",
+  "description": "Interactive TS-EAPCET 2026 College Predictor & Counselling Guide",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve -s ."
+  },
+  "keywords": [
+    "eapcet",
+    "counselling",
+    "predictor",
+    "college"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}

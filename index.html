@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MarsMate TS-EAPCET 2026 | College Predictor & Counselling Companion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <meta name="description" content="TS-EAPCET 2026: Predict college admissions by rank, simulate mock allotment, compare colleges, and plan your counselling with MarsMate.">
+  <meta name="theme-color" content="#070707">
+</head>
+<body>
+
+  <div class="glow-accent glow-1"></div>
+  <div class="glow-accent glow-2"></div>
+  <div class="glow-accent glow-3"></div>
+
+  <div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar glass-panel" id="sidebar">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" width="26" height="26" stroke="currentColor" stroke-width="2.5" fill="none" class="logo-icon"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          <span class="logo-text">MarsMate <span class="gradient-text">EAPCET</span></span>
+        </div>
+        <p class="tagline">Counselling Companion 2026</p>
+        <button type="button" class="sidebar-mobile-toggle" id="sidebar-mobile-toggle" style="display:none">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Edit Profile
+        </button>
+      </div>
+
+      <div class="profile-section" id="profile-section">
+        <h3 class="section-title">Student Profile</h3>
+
+        <div class="profile-mode-selector">
+          <button type="button" class="btn-toggle active" id="mode-rank-btn">Use Rank</button>
+          <button type="button" class="btn-toggle" id="mode-marks-btn">Use Marks</button>
+        </div>
+
+        <div class="input-group" id="group-rank">
+          <label for="student-rank">EAPCET Rank</label>
+          <div class="input-wrapper">
+            <input type="number" id="student-rank" placeholder="e.g., 8500" min="1" max="200000">
+            <span class="input-icon">#</span>
+          </div>
+        </div>
+
+        <div class="input-group hidden" id="group-marks">
+          <label for="student-marks">EAPCET Marks (Out of 160)</label>
+          <div class="input-wrapper">
+            <input type="number" id="student-marks" placeholder="e.g., 115" min="0" max="160">
+            <span class="input-icon">★</span>
+          </div>
+          <div class="rank-prediction-box hidden" id="rank-prediction-display">
+            Predicted Rank: <span class="font-bold" id="predicted-rank-val">N/A</span>
+          </div>
+        </div>
+
+        <!-- Eligibility Warning (shown when marks/rank entered) -->
+        <div id="eligibility-warning" style="display:none"></div>
+
+        <div class="input-group">
+          <label>Gender / Pool</label>
+          <div class="radio-card-group">
+            <label class="radio-card">
+              <input type="radio" name="gender" value="GENERAL">
+              <span class="radio-card-content"><span class="title">General</span><span class="desc">All Colleges</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="gender" value="BOYS" checked>
+              <span class="radio-card-content"><span class="title">Boys</span><span class="desc">Co-ed Only</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="gender" value="GIRLS">
+              <span class="radio-card-content"><span class="title">Girls</span><span class="desc">All + Women's</span></span>
+            </label>
+          </div>
+          <div id="womens-prioritize-row" style="display:none;margin-top:8px;padding:8px 10px;background:#EDEDED;border-radius:var(--radius-sm);border:1px solid #C4C4C4">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary)">
+              <input type="checkbox" id="prioritize-womens" style="accent-color:var(--primary);width:15px;height:15px">
+              Prioritize Women's Colleges First
+            </label>
+            <p style="font-size:11px;color:var(--text-secondary);margin-top:3px;margin-left:23px">Women-only colleges will appear at the top of each tier group</p>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="student-category">Reservation Category</label>
+          <select id="student-category">
+            <option value="OC">OC (Open Competition)</option>
+            <option value="EWS">EWS (Economically Weaker Section)</option>
+            <option value="BC_A">BC-A</option>
+            <option value="BC_B">BC-B</option>
+            <option value="BC_C">BC-C</option>
+            <option value="BC_D">BC-D</option>
+            <option value="BC_E">BC-E</option>
+            <option value="SC_I">SC Group I</option>
+            <option value="SC_II">SC Group II</option>
+            <option value="SC_III">SC Group III</option>
+            <option value="ST">ST (Scheduled Tribe)</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="student-region">Region Eligibility</label>
+          <select id="student-region">
+            <option value="OU">OU Area (Local)</option>
+            <option value="NL">Non-Local</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Annual Family Income</label>
+          <div class="radio-card-group vertical">
+            <label class="radio-card mini">
+              <input type="radio" name="income" value="below" checked>
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">Below ₹2 Lakhs/yr</span></span>
+            </label>
+            <label class="radio-card mini">
+              <input type="radio" name="income" value="above">
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">₹2–8 Lakhs/yr</span></span>
+            </label>
+            <label class="radio-card mini">
+              <input type="radio" name="income" value="high">
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">Above ₹8 Lakhs/yr</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="ts-study-record" checked>
+          <label for="ts-study-record">Studied in TS for 4+ of last 7 years</label>
+        </div>
+      </div>
+
+      <div class="sidebar-summary-panel">
+        <h4 class="summary-title">Fee Reimbursement</h4>
+        <div id="reimbursement-badge" class="reimb-badge eligible">
+          <span>✔</span> <span class="text">Eligible (Full)</span>
+        </div>
+        <p class="summary-desc" id="reimbursement-desc">Enter your rank and income to see eligibility.</p>
+      </div>
+    </aside>
+
+    <!-- Main Panel -->
+    <main class="main-panel">
+
+      <header class="main-header glass-panel">
+        <nav class="nav-tabs">
+          <button class="nav-tab-btn active" data-tab="predictor">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            <span>College Predictor</span>
+          </button>
+          <button class="nav-tab-btn" data-tab="option-simulator">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span>Option Form</span>
+          </button>
+          <button class="nav-tab-btn" data-tab="compare">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M16 3h5v5M8 21H3v-5M12 12m-3 0a3 3 0 1 0 6 0 3 3 0 1 0-6 0M21 3L12 12M3 21l9-9"/></svg>
+            <span>Compare <span class="badge" id="compare-badge">0</span></span>
+          </button>
+          <button class="nav-tab-btn" data-tab="timeline-checklist">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Counselling</span>
+          </button>
+          <button class="nav-tab-btn nav-tab-guide" id="btn-open-user-guide" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>User Guide</span>
+            <span class="guide-new-badge" id="guide-new-badge">NEW</span>
+          </button>
+        </nav>
+      </header>
+
+      <!-- ── Live Stats Bar ── -->
+      <div class="stats-bar" id="stats-bar">
+        <div class="stats-bar-inner">
+          <div class="stats-live-badge">
+            <span class="live-dot"></span>
+            <span>LIVE</span>
+          </div>
+
+          <div class="stat-item" title="Total college predictions run on this platform">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span class="stat-count" id="stat-predictions">—</span>
+            <span class="stat-label">Predictions</span>
+          </div>
+
+          <span class="stat-sep">|</span>
+
+          <div class="stat-item" title="Total option forms built">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span class="stat-count" id="stat-optionForms">—</span>
+            <span class="stat-label">Option Forms</span>
+          </div>
+
+          <span class="stat-sep">|</span>
+
+          <div class="stat-item" title="Total mock allotments simulated">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span class="stat-count" id="stat-simulations">—</span>
+            <span class="stat-label">Simulated</span>
+          </div>
+
+          <span class="stat-sep">|</span>
+
+          <div class="stat-item" title="PDF reports exported">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span class="stat-count" id="stat-pdfDownloads">—</span>
+            <span class="stat-label">PDFs</span>
+          </div>
+
+          <span class="stat-sep">|</span>
+
+          <div class="stat-item" title="Links shared">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span class="stat-count" id="stat-shares">—</span>
+            <span class="stat-label">Shares</span>
+          </div>
+
+          <span class="stat-sep">|</span>
+
+          <div class="stat-item stat-students" title="Total students who used this platform">
+            <svg class="stat-svg" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="stat-count stat-highlight" id="stat-students">—</span>
+            <span class="stat-label">Students Helped</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Phase Banner -->
+      <div id="live-phase-strip"></div>
+
+      <!-- Mobile Profile Summary Bar (hidden on desktop, populated by JS) -->
+      <div class="mobile-profile-bar" id="mobile-profile-bar" aria-label="Current profile — tap to edit">
+        <div class="mobile-chips-scroll" id="mobile-chips-scroll">
+          <button type="button" class="profile-chip chip-rank" id="chip-rank" aria-label="Rank">Rank: —</button>
+          <button type="button" class="profile-chip chip-gender" id="chip-gender" aria-label="Gender">Boys</button>
+          <button type="button" class="profile-chip chip-category" id="chip-category" aria-label="Category">OC</button>
+          <button type="button" class="profile-chip chip-region" id="chip-region" aria-label="Region">OU</button>
+          <button type="button" class="profile-chip chip-income" id="chip-income" aria-label="Income">Below ₹2L</button>
+        </div>
+      </div>
+
+      <div class="tab-content-container">
+
+        <!-- TAB 1: COLLEGE PREDICTOR -->
+        <section class="tab-content active" id="tab-predictor">
+
+          <div class="filter-panel glass-panel">
+            <!-- Row 1: Search + View Toggle + Actions -->
+            <div class="filter-row top-row">
+              <div class="search-box">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" class="search-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="search-college" placeholder="Search college name, code, place or district…">
+              </div>
+              <div class="view-toggle-group">
+                <button type="button" class="btn-view active" id="btn-view-card" title="Card View">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="3" width="9" height="9" rx="1"/><rect x="13" y="3" width="9" height="9" rx="1"/><rect x="2" y="14" width="9" height="9" rx="1"/><rect x="13" y="14" width="9" height="9" rx="1"/></svg>
+                  Cards
+                </button>
+                <button type="button" class="btn-view" id="btn-view-table" title="Table View">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+                  Table
+                </button>
+              </div>
+              <div class="predictor-actions">
+                <button type="button" class="btn-action" id="btn-share-url" title="Share this search">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  Share
+                </button>
+              </div>
+            </div>
+
+            <!-- Row 2: Sort + Rank Buffer + Preference Mode -->
+            <div class="filter-row" style="margin-bottom:10px">
+              <div class="sort-selector">
+                <label for="sort-by">Sort By</label>
+                <select id="sort-by">
+                  <option value="recommended" selected>Recommended (Best Colleges First)</option>
+                  <option value="chance">Admission Chance</option>
+                  <option value="cutoff">Cutoff Rank (Low to High)</option>
+                  <option value="fee">Tuition Fee (Lowest First)</option>
+                  <option value="package">Avg Package (Highest First)</option>
+                  <option value="naac">NAAC Grade</option>
+                  <option value="estd">Establishment Year (Oldest First)</option>
+                </select>
+              </div>
+              <div class="buffer-slider-row">
+                <label for="rank-buffer">Rank Buffer</label>
+                <input type="range" id="rank-buffer" min="0" max="10000" step="500" value="0">
+                <span class="buffer-val" id="buffer-val-display">± 0</span>
+              </div>
+              <div class="pref-order-group">
+                <label class="pref-order-label">Preference Order</label>
+                <div class="pref-order-toggle">
+                  <button type="button" class="btn-pref-order active" id="btn-pref-college" title="Top colleges first — within each college, branches in your priority order">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    College First
+                  </button>
+                  <button type="button" class="btn-pref-order" id="btn-pref-branch" title="Top branches first — for each branch, colleges ordered by quality">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+                    Branch First
+                  </button>
+                </div>
+                <div class="pref-order-hint" id="pref-order-hint">Top 15 colleges → all preferred branches</div>
+              </div>
+            </div>
+
+            <!-- Mobile: "More Filters" toggle — hidden on desktop -->
+            <div class="mobile-filters-toggle-row">
+              <button type="button" class="mobile-filters-toggle-btn" id="mobile-filters-toggle" aria-expanded="false" aria-controls="advanced-filters-section">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                <span id="mobile-filters-toggle-label">Filters</span>
+                <svg class="filters-toggle-chevron" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+            </div>
+
+            <!-- Row 3: Multi-select Filters -->
+            <div class="filter-row advanced-ms" id="advanced-filters-section">
+
+              <!-- Branch multi-select -->
+              <div class="ms-filter-group" id="msgroup-branch">
+                <label>Branch <span class="ms-count-badge" id="ms-count-branch"></span></label>
+                <div class="ms-trigger" id="ms-trigger-branch" tabindex="0" role="button" aria-haspopup="listbox">
+                  <span id="ms-ph-branch">All Branches</span>
+                  <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="ms-panel" id="ms-panel-branch">
+                  <div class="ms-panel-actions">
+                    <button type="button" class="btn-ms-all" id="btn-msall-branch">Select All</button>
+                    <button type="button" class="btn-ms-clear" id="btn-msclear-branch">Clear</button>
+                    <input type="text" class="ms-search" id="ms-search-branch" placeholder="Search branch…">
+                  </div>
+                  <div class="ms-options-list" id="ms-options-branch"></div>
+                </div>
+              </div>
+
+              <!-- District multi-select -->
+              <div class="ms-filter-group" id="msgroup-district">
+                <label>District <span class="ms-count-badge" id="ms-count-district"></span></label>
+                <div class="ms-trigger" id="ms-trigger-district" tabindex="0" role="button" aria-haspopup="listbox">
+                  <span id="ms-ph-district">All Districts</span>
+                  <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="ms-panel" id="ms-panel-district">
+                  <div class="ms-panel-actions">
+                    <button type="button" class="btn-ms-all" id="btn-msall-district">Select All</button>
+                    <button type="button" class="btn-ms-clear" id="btn-msclear-district">Clear</button>
+                    <input type="text" class="ms-search" id="ms-search-district" placeholder="Search district…">
+                  </div>
+                  <div class="ms-options-list" id="ms-options-district"></div>
+                </div>
+              </div>
+
+              <!-- Type multi-select -->
+              <div class="ms-filter-group" id="msgroup-type">
+                <label>Type <span class="ms-count-badge" id="ms-count-type"></span></label>
+                <div class="ms-trigger" id="ms-trigger-type" tabindex="0" role="button" aria-haspopup="listbox">
+                  <span id="ms-ph-type">All Types</span>
+                  <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="ms-panel" id="ms-panel-type">
+                  <div class="ms-panel-actions">
+                    <button type="button" class="btn-ms-all" id="btn-msall-type">Select All</button>
+                    <button type="button" class="btn-ms-clear" id="btn-msclear-type">Clear</button>
+                  </div>
+                  <div class="ms-options-list" id="ms-options-type"></div>
+                </div>
+              </div>
+
+              <!-- Affiliation multi-select -->
+              <div class="ms-filter-group" id="msgroup-affiliation">
+                <label>Affiliation <span class="ms-count-badge" id="ms-count-affiliation"></span></label>
+                <div class="ms-trigger" id="ms-trigger-affiliation" tabindex="0" role="button" aria-haspopup="listbox">
+                  <span id="ms-ph-affiliation">All Affiliations</span>
+                  <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="ms-panel" id="ms-panel-affiliation">
+                  <div class="ms-panel-actions">
+                    <button type="button" class="btn-ms-all" id="btn-msall-affiliation">Select All</button>
+                    <button type="button" class="btn-ms-clear" id="btn-msclear-affiliation">Clear</button>
+                  </div>
+                  <div class="ms-options-list" id="ms-options-affiliation"></div>
+                </div>
+              </div>
+
+              <!-- Keep hostel/NAAC checkboxes -->
+              <div class="filter-checkbox-group">
+                <input type="checkbox" id="filter-hostel">
+                <label for="filter-hostel">Hostel Available</label>
+              </div>
+              <div class="filter-checkbox-group">
+                <input type="checkbox" id="filter-naac">
+                <label for="filter-naac">NAAC A or above</label>
+              </div>
+            </div>
+
+            <!-- Priority chips area (shown when any filter is active) -->
+            <div class="filter-chips-section" id="filter-chips-section">
+              <div class="chips-row" id="chips-row-branch">
+                <span class="chips-label">Branch Priority:</span>
+                <div class="chips-container" id="chips-branch"></div>
+              </div>
+              <div class="chips-row" id="chips-row-district">
+                <span class="chips-label">Districts:</span>
+                <div class="chips-container" id="chips-district"></div>
+              </div>
+              <div class="chips-row" id="chips-row-type">
+                <span class="chips-label">Types:</span>
+                <div class="chips-container" id="chips-type"></div>
+              </div>
+              <div class="chips-row" id="chips-row-affiliation">
+                <span class="chips-label">Affiliations:</span>
+                <div class="chips-container" id="chips-affiliation"></div>
+              </div>
+              <div class="chips-add-all-row" id="chips-add-all-row">
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-add-filtered-to-options">
+                  <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M12 5v14M5 12h14"/></svg>
+                  Add All Filtered to Option Form
+                </button>
+              </div>
+            </div>
+
+            <!-- Cutoff disclaimer -->
+            <div class="cutoff-disclaimer">
+              <span class="disc-icon">⚠️</span>
+              <span>Cutoffs shown are from <strong>TS-EAPCET 2025</strong> (all 3 phases). Actual 2026 cutoffs will vary — use as a planning guide only.</span>
+            </div>
+
+            <div class="filter-summary">
+              <span id="matching-counts">Showing 0 options across 0 colleges</span>
+              <div class="filter-summary-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="btn-sync-to-options">
+                  <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  Sync to Option Form
+                </button>
+                <button type="button" class="btn-clear-filters" id="btn-reset-filters">Reset Filters</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tier legend -->
+          <div class="tier-legend">
+            <span class="tier-legend-label">Admission Chance:</span>
+            <span class="tier-dot safe">Safe Pick</span>
+            <span class="tier-dot likely">Good Bet</span>
+            <span class="tier-dot borderline">Borderline</span>
+            <span class="tier-dot reach">Reach</span>
+          </div>
+
+          <!-- Branch caution (shown when no branch filter is active) -->
+          <div class="branch-caution-msg" id="branch-caution-msg">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Showing all branches. Use the <strong>Branch</strong> filter above to select specific branches — results will split into per-branch cards with priority ordering.</span>
+          </div>
+
+          <!-- Results container (card view or table view) -->
+          <div id="predictions-container"></div>
+
+        </section>
+
+        <!-- TAB 2: OPTION FORM SIMULATOR -->
+        <section class="tab-content" id="tab-option-simulator">
+          <div class="simulator-layout">
+
+            <div class="options-selector-panel glass-panel">
+              <h3 class="panel-subtitle">Available Branches</h3>
+              <p class="panel-description">Search and add branches to your preference list.</p>
+
+              <!-- Active predictor filter notice (shown when predictor filters are set) -->
+              <div class="sim-filter-notice" id="sim-filter-notice" style="display:none">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                <span id="sim-filter-notice-text">Filtered by predictor</span>
+                <button type="button" class="sim-notice-clear" id="btn-sim-clear-filters">Show All</button>
+              </div>
+
+              <div class="sim-search-row">
+                <input type="text" id="sim-search-input" placeholder="Search college or branch…">
+                <select id="sim-branch-filter"><option value="all">All Branches</option></select>
+              </div>
+              <div class="sim-available-list" id="sim-available-container"></div>
+            </div>
+
+            <div class="preference-list-panel glass-panel">
+              <div class="pref-list-header">
+                <div>
+                  <h3 class="panel-subtitle">My Option Form</h3>
+                  <p class="panel-description" id="pref-list-counter">0 options added. Reorder to set priority.</p>
+                </div>
+                <div class="pref-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-pref">Clear All</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-print-options" title="Print Option Form">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-wa-share-options" title="Share via WhatsApp">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Share
+                  </button>
+                  <button type="button" class="btn btn-primary btn-sm" id="btn-simulate-allotment">
+                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Simulate Allotment
+                  </button>
+                </div>
+              </div>
+              <div class="preference-list-items" id="pref-list-container">
+                <div class="empty-state">
+                  <svg viewBox="0 0 24 24" width="40" height="40" stroke="currentColor" stroke-width="1.5" fill="none" class="empty-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                  <p>Option Form is Empty</p>
+                  <p class="sub-text">Click "+" on the left panel to add branches in your preferred priority order.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TAB 3: COLLEGE COMPARER -->
+        <section class="tab-content" id="tab-compare">
+          <div class="compare-container glass-panel" id="compare-view-container">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24" width="40" height="40" stroke="currentColor" stroke-width="1.5" fill="none" class="empty-icon"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+              <p>Compare List is Empty</p>
+              <p class="sub-text">Click the compare icon on college cards in the Predictor tab (up to 4 colleges).</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: COUNSELLING -->
+        <section class="tab-content" id="tab-timeline-checklist">
+
+          <!-- Sub-navigation -->
+          <div class="counselling-tabs">
+            <button type="button" class="counselling-tab-btn active" data-csub="timeline">📅 Timeline</button>
+            <button type="button" class="counselling-tab-btn" data-csub="checklist">✅ Checklist</button>
+            <button type="button" class="counselling-tab-btn" data-csub="fee-calc">💰 Fee Calculator</button>
+            <button type="button" class="counselling-tab-btn" data-csub="strategy">🎯 Phase Strategy</button>
+            <button type="button" class="counselling-tab-btn" data-csub="after-allotment">📋 After Allotment</button>
+            <button type="button" class="counselling-tab-btn" data-csub="info-hub">ℹ️ Info Hub</button>
+          </div>
+
+          <!-- Sub-tab: Timeline + original checklist (side by side) -->
+          <div class="counselling-sub active" id="csub-timeline">
+            <div class="timeline-checklist-layout">
+              <div class="timeline-panel glass-panel">
+                <h3 class="panel-subtitle">Counselling Timeline 2026</h3>
+                <p class="panel-description">Follow these phases and steps to prevent seat cancellation.</p>
+                <div class="timeline-container" id="timeline-container"></div>
+              </div>
+              <div class="checklist-panel glass-panel">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                  <h3 class="panel-subtitle" style="margin-bottom:0">Certificate Checklist</h3>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-wa-share-checklist" title="Share checklist via WhatsApp">
+                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Share
+                  </button>
+                </div>
+                <p class="panel-description">Check off documents once prepared. Bring originals + 2 Xerox sets to HLC.</p>
+                <div class="checklist-items-container" id="checklist-container"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-tab: Detailed Checklist with doc links -->
+          <div class="counselling-sub" id="csub-checklist">
+            <div class="glass-panel" style="padding:16px">
+              <h3 class="panel-subtitle" style="margin-bottom:14px">Document Verification Checklist</h3>
+              <div id="detailed-checklist-container" style="display:flex;flex-direction:column;gap:8px"></div>
+            </div>
+          </div>
+
+          <!-- Sub-tab: Fee Reimbursement Calculator -->
+          <div class="counselling-sub" id="csub-fee-calc">
+            <div class="fee-calc-layout">
+              <div class="fee-calc-panel glass-panel">
+                <h3>Fee Reimbursement Calculator</h3>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Calculate your eligibility for TS government tuition fee reimbursement.</p>
+                <div class="calc-step">
+                  <label>EAPCET Rank</label>
+                  <div class="input-wrapper"><input type="number" id="calc-rank" placeholder="e.g., 8500" min="1" max="200000"><span class="input-icon">#</span></div>
+                </div>
+                <div class="calc-step">
+                  <label>Reservation Category</label>
+                  <select id="calc-category">
+                    <option value="OC">OC</option><option value="EWS">EWS</option>
+                    <option value="BC">BC (Any group)</option><option value="SC">SC (Any group)</option>
+                    <option value="ST">ST</option>
+                  </select>
+                </div>
+                <div class="calc-step">
+                  <label>Annual Family Income</label>
+                  <select id="calc-income">
+                    <option value="below1">Below ₹1 Lakh/yr</option>
+                    <option value="below2">₹1–2 Lakhs/yr</option>
+                    <option value="2to5">₹2–5 Lakhs/yr</option>
+                    <option value="5to8">₹5–8 Lakhs/yr</option>
+                    <option value="above8">Above ₹8 Lakhs/yr</option>
+                  </select>
+                </div>
+                <div class="calc-step">
+                  <label>College Type</label>
+                  <select id="calc-college-type">
+                    <option value="govt">Government / Constituent College</option>
+                    <option value="pvt">Private (Convener Quota)</option>
+                  </select>
+                </div>
+                <div class="calc-step">
+                  <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="calc-ts-study" checked> Studied in TS for 4+ of last 7 years</label>
+                </div>
+                <button type="button" class="btn btn-primary" id="btn-calc-reimb" style="width:100%;margin-top:4px">
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  Calculate Eligibility
+                </button>
+              </div>
+              <div class="fee-calc-panel glass-panel">
+                <h3>Eligibility Result</h3>
+                <div id="calc-result-container">
+                  <div class="empty-state" style="padding:40px 20px">
+                    <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none" class="empty-icon"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <p style="font-size:13px">Fill the form and click Calculate</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sub-tab: After Allotment -->
+          <div class="counselling-sub" id="csub-after-allotment">
+            <div id="after-allotment-content"></div>
+          </div>
+
+          <!-- Sub-tab: Info Hub -->
+          <div class="counselling-sub" id="csub-info-hub">
+            <div id="info-hub-content"></div>
+          </div>
+
+          <!-- Sub-tab: Phase Strategy Guide -->
+          <div class="counselling-sub" id="csub-strategy">
+            <div class="strategy-layout glass-panel">
+              <h3>Phase-wise Strategy Guide</h3>
+              <p class="strategy-intro">Based on your rank and category, here's how to approach each counselling phase.</p>
+              <div id="strategy-content">
+                <div class="empty-state" style="padding:40px 20px">
+                  <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none" class="empty-icon"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  <p style="font-size:13px">Enter your rank in the sidebar to see personalized strategy</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+
+      <!-- Floating Action Bars (mobile-only, one per key tab) -->
+      <div class="fab-bar" id="fab-bar-predictor" aria-hidden="true">
+        <button type="button" class="fab-btn" id="fab-sync-options">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Sync to Option Form
+        </button>
+      </div>
+      <div class="fab-bar" id="fab-bar-simulator" aria-hidden="true">
+        <button type="button" class="fab-btn" id="fab-simulate-allotment">
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Simulate Allotment
+        </button>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- College Detail Modal -->
+  <div class="modal-backdrop" id="college-modal">
+    <div class="modal-dialog glass-panel">
+      <div class="modal-header">
+        <h2 class="modal-title gradient-text" id="modal-college-name">College Details</h2>
+        <button type="button" class="btn-close-modal" id="btn-close-modal">×</button>
+      </div>
+      <div class="modal-body" id="modal-college-body"></div>
+    </div>
+  </div>
+
+  <!-- Allotment Simulation Modal -->
+  <div class="modal-backdrop" id="allotment-modal">
+    <div class="modal-dialog allotment-modal glass-panel">
+      <div class="modal-header">
+        <h2 class="modal-title allotment-title gradient-text">Mock Seat Allotment Result</h2>
+        <button type="button" class="btn-close-modal" id="btn-close-allotment">×</button>
+      </div>
+      <div class="modal-body allotment-body" id="allotment-result-body"></div>
+    </div>
+  </div>
+
+  <!-- Share URL modal -->
+  <div class="modal-backdrop" id="share-modal">
+    <div class="modal-dialog glass-panel" style="max-width:420px">
+      <div class="modal-header">
+        <h2 class="modal-title">Share Your Search</h2>
+        <button type="button" class="btn-close-modal" id="btn-close-share">×</button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">This link encodes your rank, category, and filters. Share it with parents or counsellors.</p>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="share-url-input" readonly style="flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg-app)">
+          <button type="button" class="btn btn-primary btn-sm" id="btn-copy-url">Copy</button>
+        </div>
+        <p id="share-copy-msg" style="font-size:11px;color:var(--safe-color);margin-top:8px;display:none">✔ Copied to clipboard!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Guide Modal -->
+  <div class="modal-backdrop" id="user-guide-modal">
+    <div class="modal-dialog user-guide-dialog glass-panel">
+      <div class="modal-header user-guide-header">
+        <div class="guide-header-content">
+          <div class="guide-header-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div>
+            <h2 class="modal-title gradient-text">How to Use MarsMate EAPCET</h2>
+            <p class="guide-header-sub">Complete step-by-step guide — from profile to seat allotment</p>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-user-guide">×</button>
+      </div>
+      <div class="modal-body user-guide-body">
+
+        <!-- Step 1 -->
+        <div class="guide-step">
+          <div class="guide-step-num">1</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Fill Your Student Profile <span class="guide-step-tag sidebar-tag">Sidebar</span></h3>
+            <p class="guide-step-intro">Everything starts from the sidebar on the left. This is your profile — the predictor, option form, and fee calculator all use it automatically.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">🎯</span><div><strong>Rank or Marks mode:</strong> Toggle between "Use Rank" (enter your EAPCET rank directly) and "Use Marks" (enter your score out of 160 — your rank is auto-predicted from the table).</div></li>
+              <li><span class="gc-icon">👤</span><div><strong>Gender / Pool:</strong> <em>General</em> shows all colleges, <em>Boys</em> shows co-ed only, <em>Girls</em> shows all colleges plus women-only institutions. With Girls selected, you can also "Prioritize Women's Colleges First."</div></li>
+              <li><span class="gc-icon">📋</span><div><strong>Reservation Category:</strong> Choose your caste certificate category (OC, EWS, BC-A to BC-E, SC Group I–III, ST). This controls which cutoffs are used for predictions.</div></li>
+              <li><span class="gc-icon">📍</span><div><strong>Region Eligibility:</strong> <em>OU Area</em> if you studied in Hyderabad/Rangareddy/Medchal district (Osmania local area). <em>Non-Local</em> otherwise. OU-local students get 85% of seats reserved.</div></li>
+              <li><span class="gc-icon">💰</span><div><strong>Annual Family Income:</strong> Determines your fee reimbursement eligibility. Below ₹2L qualifies for the most benefits.</div></li>
+              <li><span class="gc-icon">📚</span><div><strong>TS Study Record:</strong> Check this if you've studied in Telangana for at least 4 of the last 7 years — required for fee reimbursement.</div></li>
+            </ul>
+            <div class="guide-tip">
+              <span class="guide-tip-icon">💡</span>
+              The <strong>Fee Reimbursement badge</strong> at the bottom of the sidebar updates instantly as you change income and category — check it to know if you're eligible for ₹35,000–₹1,15,000/year.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="guide-step">
+          <div class="guide-step-num">2</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Understand the College Predictor <span class="guide-step-tag predictor-tag">College Predictor Tab</span></h3>
+            <p class="guide-step-intro">The predictor shows colleges and branches where your rank has a realistic chance, using 2025 cutoffs from all 3 phases.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">🟢</span><div><strong>Safe Pick:</strong> Your rank is well below the cutoff — very high probability of admission in Phase 1 itself.</div></li>
+              <li><span class="gc-icon">🔵</span><div><strong>Good Bet:</strong> Your rank is at or near the cutoff — strong probability, especially across multiple phases.</div></li>
+              <li><span class="gc-icon">🟡</span><div><strong>Borderline:</strong> Your rank is slightly above the cutoff — possible if cutoffs ease in Phase 2 or Final Phase.</div></li>
+              <li><span class="gc-icon">🔴</span><div><strong>Reach:</strong> Cutoff is well below your rank — unlikely unless significant expansion happens.</div></li>
+              <li><span class="gc-icon">↑↓→</span><div><strong>Trend arrow next to cutoffs:</strong> ↑ means cutoff got harder (Phase 1 → Final); ↓ means easier; → means stable. Shows how competitive a seat became over phases.</div></li>
+              <li><span class="gc-icon">⭐🥇🥈🥉</span><div><strong>Quality tiers (Recommended sort):</strong> Elite, Premier, Good, Standard — ranked by placement outcomes (35%), NIRF rank (25%), NAAC grade (20%), and college type (10%).</div></li>
+            </ul>
+            <div class="guide-tip">
+              <span class="guide-tip-icon">💡</span>
+              Use <strong>Rank Buffer</strong> (slider in the filter bar) to add ±N to your rank and see how results change — useful for planning if your 2026 rank shifts slightly.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="guide-step">
+          <div class="guide-step-num">3</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Filter, Sort, and Narrow Results <span class="guide-step-tag predictor-tag">College Predictor Tab</span></h3>
+            <p class="guide-step-intro">Use the filter bar above the results to drill down to exactly what you want.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">🔍</span><div><strong>Search box:</strong> Search by college name, EAPCET code (e.g., CBIT), place, or district.</div></li>
+              <li><span class="gc-icon">📊</span><div><strong>Sort By:</strong> Switch between Recommended (default — best ROI first), Admission Chance, Tuition Fee (lowest first), Avg Package (highest first), NAAC Grade, or Estd. Year.</div></li>
+              <li><span class="gc-icon">🌿</span><div><strong>Branch filter:</strong> Click to pick specific branches (CSE, ECE, EEE…). Selected branches appear as draggable chips — drag them to set your priority order.</div></li>
+              <li><span class="gc-icon">📍</span><div><strong>District filter:</strong> Narrow to one or more districts (e.g., Hyderabad, Rangareddy, Warangal).</div></li>
+              <li><span class="gc-icon">🏛</span><div><strong>Type / Affiliation filters:</strong> Government vs Private vs Deemed; JNTUH vs OU vs KU vs Deemed.</div></li>
+              <li><span class="gc-icon">🛏</span><div><strong>Hostel / NAAC checkboxes:</strong> Quick toggle for hostels and NAAC A+ or above.</div></li>
+              <li><span class="gc-icon">🔀</span><div><strong>Preference Order toggle:</strong> <em>College First</em> groups results by college (top college → all your branches). <em>Branch First</em> groups by branch (top branch → all matching colleges). Both modes respect your branch priority order.</div></li>
+              <li><span class="gc-icon">📋📊</span><div><strong>Cards / Table toggle:</strong> Switch between visual college cards and a compact sortable table view.</div></li>
+            </ul>
+            <div class="guide-tip">
+              <span class="guide-tip-icon">💡</span>
+              Click <strong>"Add All Filtered to Option Form"</strong> or <strong>"Sync to Option Form"</strong> in the filter bar to push your entire filtered list directly into the Option Form — a big time-saver.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="guide-step">
+          <div class="guide-step-num">4</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Build Your Option Form <span class="guide-step-tag option-tag">Option Form Tab</span></h3>
+            <p class="guide-step-intro">The Option Form is your ranked preference list — the actual order you'll submit during TSCHE counselling. Priority #1 at the top means it's your most wanted seat.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">➕</span><div><strong>Add branches:</strong> Search the left panel for any college+branch combination. Click the <strong>"+"</strong> button to add it to your list on the right.</div></li>
+              <li><span class="gc-icon">🃏</span><div><strong>From Predictor cards:</strong> Click <strong>"Add Options"</strong> on any college card to add all its branches (sorted by cutoff) in one click.</div></li>
+              <li><span class="gc-icon">↕</span><div><strong>Reorder by drag:</strong> Drag items in the right panel up or down to set your priority. TSCHE will assign you the highest option in this list that your rank qualifies for.</div></li>
+              <li><span class="gc-icon">🗑</span><div><strong>Remove an option:</strong> Click the <strong>×</strong> button on any row to remove it from your list.</div></li>
+              <li><span class="gc-icon">🖨</span><div><strong>Print / Share:</strong> Use the Print button to get a printable copy. Use Share to send your option form via WhatsApp to parents or counsellors.</div></li>
+            </ul>
+            <div class="guide-tip">
+              <span class="guide-tip-icon">⚠️</span>
+              <strong>Important:</strong> Always put your dream college+branch at position #1. Include 50–100 options covering Safe, Good Bet, and Borderline picks — the more options you enter, the safer you are.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="guide-step">
+          <div class="guide-step-num">5</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Simulate Your Allotment <span class="guide-step-tag option-tag">Option Form Tab</span></h3>
+            <p class="guide-step-intro">Once your option list is ready, simulate what seat TSCHE is most likely to assign you.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">▶</span><div><strong>Click "Simulate Allotment"</strong> in the Option Form tab — the system scans your list top to bottom and returns the first seat where your rank is below or near the 2025 cutoff.</div></li>
+              <li><span class="gc-icon">📊</span><div><strong>Phase-wise probability</strong> is shown for each branch: Phase 1, Phase 2, and Final Phase chances are color-coded (High / Medium / Low / Very Low).</div></li>
+              <li><span class="gc-icon">🔁</span><div><strong>Adjust and retry:</strong> If you don't like the simulated result, rearrange your list or add more options and simulate again.</div></li>
+            </ul>
+            <div class="guide-tip">
+              <span class="guide-tip-icon">💡</span>
+              The simulation uses 2025 Final Phase cutoffs as a baseline. Real 2026 cutoffs may shift — treat this as a planning tool, not a guaranteed prediction.
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="guide-step">
+          <div class="guide-step-num">6</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Compare Colleges Side-by-Side <span class="guide-step-tag compare-tag">Compare Tab</span></h3>
+            <p class="guide-step-intro">Use the Compare tab to place up to 4 colleges side by side and make informed decisions.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">⊟</span><div><strong>Add to compare:</strong> In the College Predictor, click the <strong>compare icon (⊟)</strong> on any college card. The badge on the Compare tab shows how many are selected.</div></li>
+              <li><span class="gc-icon">📋</span><div><strong>Comparison table covers:</strong> Location, college type, affiliation, NAAC grade, founding year, hostel availability, 1-year and total B.Tech fee, average placement, highest package, top recruiters, and available branches.</div></li>
+              <li><span class="gc-icon">✕</span><div><strong>Remove a college:</strong> Click "Remove" under a college header in the compare table to deselect it.</div></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 7 -->
+        <div class="guide-step">
+          <div class="guide-step-num">7</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Use the Counselling Tab <span class="guide-step-tag counsel-tag">Counselling Tab</span></h3>
+            <p class="guide-step-intro">The Counselling tab has six sub-sections covering everything you need from dates to documents to strategy.</p>
+            <ul class="guide-checklist">
+              <li><span class="gc-icon">📅</span><div><strong>Timeline:</strong> Key dates for Phase 1, Phase 2, and Final Phase — slot booking, option form entry, allotment, and reporting deadlines.</div></li>
+              <li><span class="gc-icon">✅</span><div><strong>Checklist:</strong> Full list of documents needed for Helpline Centre (HLC) certificate verification. Check items off as you prepare. Click Share to send the list via WhatsApp.</div></li>
+              <li><span class="gc-icon">💰</span><div><strong>Fee Calculator:</strong> Enter your rank, category, income, and college type to get an exact eligibility result and a full annual budget breakdown (tuition + hostel + mess + extras).</div></li>
+              <li><span class="gc-icon">🎯</span><div><strong>Phase Strategy:</strong> Enter your rank in the sidebar first — then this section gives you personalized advice for each counselling phase based on your rank tier.</div></li>
+              <li><span class="gc-icon">📋</span><div><strong>After Allotment:</strong> Step-by-step guide on what to do after you receive a seat — reporting, fee payment, uploading documents, and avoiding seat cancellation.</div></li>
+              <li><span class="gc-icon">ℹ️</span><div><strong>Info Hub:</strong> Official links (TSCHE, TSSP, NAAC), FAQ, and key eligibility requirements at a glance.</div></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 8 — Key Tips -->
+        <div class="guide-step guide-step-tips">
+          <div class="guide-step-num tips-num">✦</div>
+          <div class="guide-step-content">
+            <h3 class="guide-step-title">Key Tips &amp; Reminders</h3>
+            <div class="guide-tips-grid">
+              <div class="guide-tip-card">
+                <span class="gtc-icon">📅</span>
+                <strong>2025 cutoffs are the baseline</strong>
+                <p>All predictions use 2025 Final Phase data. 2026 cutoffs will vary. Use this tool for planning, not as an official prediction.</p>
+              </div>
+              <div class="guide-tip-card">
+                <span class="gtc-icon">📝</span>
+                <strong>Enter options for all 3 phases</strong>
+                <p>Don't stop after Phase 1. Cutoffs usually ease in Phase 2 and Final Phase — better seats may open up.</p>
+              </div>
+              <div class="guide-tip-card">
+                <span class="gtc-icon">💾</span>
+                <strong>Your data is auto-saved</strong>
+                <p>Your option form and checklist are saved in your browser automatically. Revisit anytime — no login needed.</p>
+              </div>
+              <div class="guide-tip-card">
+                <span class="gtc-icon">🔗</span>
+                <strong>Share your search easily</strong>
+                <p>Click the <em>Share</em> button in the Predictor tab to copy a link encoding your rank, category, and filters. Send it to parents or counsellors.</p>
+              </div>
+              <div class="guide-tip-card">
+                <span class="gtc-icon">💸</span>
+                <strong>Check fee reimbursement first</strong>
+                <p>If your income is below ₹2L and you studied in TS, you likely qualify for ₹35,000–₹1,15,000/year off your tuition. Check the Counselling → Fee Calculator.</p>
+              </div>
+              <div class="guide-tip-card">
+                <span class="gtc-icon">🏛</span>
+                <strong>Prefer Government colleges</strong>
+                <p>Government / constituent colleges (UCE, JNTUH) have much lower fees and fee reimbursement applies fully. Keep them high in your option form.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="guide-footer">
+          <label class="guide-no-show-label">
+            <input type="checkbox" id="guide-dont-show-again">
+            Don't show this guide automatically on future visits
+          </label>
+          <button type="button" class="btn btn-primary" id="btn-guide-got-it">Got it, let's predict →</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Setup Wizard ── -->
+  <div class="setup-wizard-backdrop" id="setup-wizard" aria-modal="true" role="dialog">
+    <div class="setup-wizard-card">
+
+      <!-- Step 0: Welcome -->
+      <div class="wz-step active" id="wz-step-0">
+        <div class="wz-welcome-icon">
+          <svg viewBox="0 0 24 24" width="36" height="36" stroke="#fff" stroke-width="2" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h2 class="wz-title">Welcome to<br><span class="gradient-text">MarsMate EAPCET 2026</span></h2>
+        <p class="wz-desc">Your complete TS-EAPCET counselling companion — predict colleges, build your option form, and plan your seat strategy.</p>
+        <div class="wz-features">
+          <div class="wz-feature"><span class="wz-feature-dot safe-dot"></span>Predict admission chances by rank &amp; category</div>
+          <div class="wz-feature"><span class="wz-feature-dot likely-dot"></span>Build &amp; simulate your counselling option form</div>
+          <div class="wz-feature"><span class="wz-feature-dot reach-dot"></span>Check fee reimbursement &amp; counselling strategy</div>
+        </div>
+        <button type="button" class="btn btn-primary wz-btn-full" id="wz-start">
+          Set Up My Profile
+          <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" class="wz-skip-link" id="wz-skip">Skip — explore on my own</button>
+      </div>
+
+      <!-- Step 1: Rank / Marks -->
+      <div class="wz-step" id="wz-step-1">
+        <div class="wz-step-header">
+          <span class="wz-step-label">Step 1 of 3</span>
+          <div class="wz-progress-bar"><div class="wz-progress-fill" style="width:33%"></div></div>
+        </div>
+        <h3 class="wz-step-title">What's your EAPCET result?</h3>
+        <p class="wz-step-sub">Enter your rank or marks — this drives all your college predictions.</p>
+
+        <div class="profile-mode-selector">
+          <button type="button" class="btn-toggle active" id="wz-mode-rank">Use Rank</button>
+          <button type="button" class="btn-toggle" id="wz-mode-marks">Use Marks</button>
+        </div>
+
+        <div class="input-group" id="wz-group-rank">
+          <label for="wz-rank">EAPCET Rank</label>
+          <div class="input-wrapper">
+            <input type="number" id="wz-rank" placeholder="e.g., 8500" min="1" max="200000">
+            <span class="input-icon">#</span>
+          </div>
+        </div>
+        <div class="input-group hidden" id="wz-group-marks">
+          <label for="wz-marks">EAPCET Marks (out of 160)</label>
+          <div class="input-wrapper">
+            <input type="number" id="wz-marks" placeholder="e.g., 115" min="0" max="160">
+            <span class="input-icon">★</span>
+          </div>
+        </div>
+
+        <div class="wz-error" id="wz-err-1">Please enter your rank or marks to get accurate predictions.</div>
+
+        <div class="wz-nav">
+          <button type="button" class="btn btn-secondary wz-nav-back" id="wz-back-1">← Back</button>
+          <button type="button" class="btn btn-primary wz-nav-next" id="wz-next-1">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Category & Gender -->
+      <div class="wz-step" id="wz-step-2">
+        <div class="wz-step-header">
+          <span class="wz-step-label">Step 2 of 3</span>
+          <div class="wz-progress-bar"><div class="wz-progress-fill" style="width:66%"></div></div>
+        </div>
+        <h3 class="wz-step-title">Category &amp; Gender Pool</h3>
+        <p class="wz-step-sub">Controls which seat cutoffs apply and which colleges appear in results.</p>
+
+        <div class="input-group">
+          <label>Gender / Pool</label>
+          <div class="radio-card-group">
+            <label class="radio-card">
+              <input type="radio" name="wz-gender" value="GENERAL">
+              <span class="radio-card-content"><span class="title">General</span><span class="desc">All Colleges</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="wz-gender" value="BOYS" checked>
+              <span class="radio-card-content"><span class="title">Boys</span><span class="desc">Co-ed Only</span></span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="wz-gender" value="GIRLS">
+              <span class="radio-card-content"><span class="title">Girls</span><span class="desc">All + Women's</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="input-group" style="margin-bottom:0">
+          <label for="wz-category">Reservation Category</label>
+          <select id="wz-category">
+            <option value="OC">OC (Open Competition)</option>
+            <option value="EWS">EWS (Economically Weaker Section)</option>
+            <option value="BC_A">BC-A</option>
+            <option value="BC_B">BC-B</option>
+            <option value="BC_C">BC-C</option>
+            <option value="BC_D">BC-D</option>
+            <option value="BC_E">BC-E</option>
+            <option value="SC_I">SC Group I</option>
+            <option value="SC_II">SC Group II</option>
+            <option value="SC_III">SC Group III</option>
+            <option value="ST">ST (Scheduled Tribe)</option>
+          </select>
+        </div>
+
+        <div class="wz-nav">
+          <button type="button" class="btn btn-secondary wz-nav-back" id="wz-back-2">← Back</button>
+          <button type="button" class="btn btn-primary wz-nav-next" id="wz-next-2">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Region & Income -->
+      <div class="wz-step" id="wz-step-3">
+        <div class="wz-step-header">
+          <span class="wz-step-label">Step 3 of 3</span>
+          <div class="wz-progress-bar"><div class="wz-progress-fill" style="width:100%"></div></div>
+        </div>
+        <h3 class="wz-step-title">Region &amp; Family Income</h3>
+        <p class="wz-step-sub">Affects local seat reservation (85%) and fee reimbursement eligibility.</p>
+
+        <div class="input-group">
+          <label for="wz-region">Region Eligibility</label>
+          <select id="wz-region">
+            <option value="OU">OU Area — Hyderabad / Rangareddy / Medchal (Local)</option>
+            <option value="NL">Non-Local</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label>Annual Family Income</label>
+          <div class="radio-card-group vertical">
+            <label class="radio-card mini">
+              <input type="radio" name="wz-income" value="below" checked>
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">Below ₹2 Lakhs / year</span></span>
+            </label>
+            <label class="radio-card mini">
+              <input type="radio" name="wz-income" value="above">
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">₹2 – 8 Lakhs / year</span></span>
+            </label>
+            <label class="radio-card mini">
+              <input type="radio" name="wz-income" value="high">
+              <span class="radio-card-content horizontal"><span class="circle-check"></span><span class="title">Above ₹8 Lakhs / year</span></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="checkbox-group" style="margin-bottom:0">
+          <input type="checkbox" id="wz-ts-study" checked>
+          <label for="wz-ts-study">Studied in Telangana for 4+ of the last 7 years</label>
+        </div>
+
+        <div class="wz-nav">
+          <button type="button" class="btn btn-secondary wz-nav-back" id="wz-back-3">← Back</button>
+          <button type="button" class="btn btn-primary wz-nav-finish" id="wz-finish">
+            Start Predicting
+            <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

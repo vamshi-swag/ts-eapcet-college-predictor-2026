@@ -1,0 +1,14 @@
+# Exclude raw data directories
+/main data/
+/ts eapcet data/
+/scratch/
+
+# Exclude processing scripts (not needed to run the client application)
+*.py
+/fix_packages_node.mjs
+
+# Exclude potential runtime/dependency folders
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
