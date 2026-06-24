@@ -618,17 +618,28 @@ select:focus { border-color: var(--secondary); outline: none; box-shadow: 0 0 0 
 .ranking-card-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ranking-card-meta { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 .ranking-card-badges { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
-.ranking-compare-btn {
-  display: none;
-  align-items: center; justify-content: center; gap: 4px;
-  margin-top: 6px; width: 100%;
-  padding: 5px 6px; font-size: 10.5px; font-weight: 600;
-  border-radius: 6px; border: 1px solid var(--border);
-  background: var(--bg-card); color: var(--text-muted);
-  cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+.ranking-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  align-self: stretch;
+  justify-content: flex-start;
+  flex-shrink: 0;
 }
-.ranking-compare-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-10); }
-.ranking-compare-btn.active { background: var(--accent-10); color: var(--accent); border-color: var(--accent); }
+.ranking-compare-icon-btn {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ranking-compare-icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-10); }
+.ranking-compare-icon-btn.active { background: var(--accent-10); color: var(--accent); border-color: var(--accent); }
 .ranking-card-score {
   font-size: 10px; font-weight: 700;
   background: var(--bg-app); border: 1px solid var(--border);
@@ -981,7 +992,6 @@ button { cursor: pointer; }
 @media (max-width: 1024px) {
   .app-container { grid-template-columns: 280px 1fr; }
   .college-ranking-grid { grid-template-columns: 1fr 1fr; }
-  .ranking-compare-btn { display: inline-flex; }
 }
 
 /* ══════════════════════════════════════════════
@@ -3890,6 +3900,16 @@ button { cursor: pointer; }
     display: flex;
     align-items: center;
     margin-top: 0;
+  }
+
+  /* Panels open UPWARD inside the bottom sheet so they don't fall off-screen */
+  #advanced-filters-section.filters-open .ms-panel {
+    top: auto;
+    bottom: calc(100% + 4px);
+  }
+  /* Shrink the options list a little on mobile so the panel stays compact */
+  #advanced-filters-section.filters-open .ms-options-list {
+    max-height: 140px;
   }
 }
 

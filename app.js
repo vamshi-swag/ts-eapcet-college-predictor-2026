@@ -964,15 +964,16 @@ function renderCollegeRanking() {
         <div class="ranking-card-name">${c.name}</div>
         <div class="ranking-card-meta">${c.code} · ${c.district} · Pkg: ${pkgText} · Fee: ${feeText}</div>
         <div class="ranking-card-badges">${typeBadge}${naacBadge}${nirfBadge}</div>
-        <button type="button" class="ranking-compare-btn${inCompare ? ' active' : ''}" data-ranking-compare="${c.code}">
-          <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
-          ${inCompare ? 'Remove' : 'Compare'}
-        </button>
       </div>
-      <div class="ranking-card-score ${tierClass}">${score}</div>
+      <div class="ranking-card-right">
+        <button type="button" class="ranking-compare-icon-btn${inCompare ? ' active' : ''}" data-ranking-compare="${c.code}" title="${inCompare ? 'Remove from compare' : 'Add to compare'}">
+          <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+        </button>
+        <div class="ranking-card-score ${tierClass}">${score}</div>
+      </div>
     `;
     card.addEventListener('click', () => openCollegeModal(c.code));
-    card.querySelector('.ranking-compare-btn').addEventListener('click', e => {
+    card.querySelector('.ranking-compare-icon-btn').addEventListener('click', e => {
       e.stopPropagation();
       toggleCompare(c.code);
     });
@@ -1354,7 +1355,7 @@ function syncRankingCompareButtons() {
     const code = btn.getAttribute('data-ranking-compare');
     const inList = state.compareList.includes(code);
     btn.classList.toggle('active', inList);
-    btn.innerHTML = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg> ${inList ? 'Remove' : 'Compare'}`;
+    btn.title = inList ? 'Remove from compare' : 'Add to compare';
   });
 }
 
