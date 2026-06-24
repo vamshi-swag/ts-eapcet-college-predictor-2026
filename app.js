@@ -954,6 +954,7 @@ function renderCollegeRanking() {
     const feeText = c.fee_1yr ? `₹${Math.round(c.fee_1yr / 1000)}k/yr` : '—';
     const tierClass = tier === 'elite' ? 'ranking-score-elite' : tier === 'premier' ? 'ranking-score-premier' : 'ranking-score-good';
 
+    const inCompare = state.compareList.includes(c.code);
     const card = document.createElement('div');
     card.className = 'ranking-card';
     card.title = `Click to view details`;
@@ -963,10 +964,18 @@ function renderCollegeRanking() {
         <div class="ranking-card-name">${c.name}</div>
         <div class="ranking-card-meta">${c.code} · ${c.district} · Pkg: ${pkgText} · Fee: ${feeText}</div>
         <div class="ranking-card-badges">${typeBadge}${naacBadge}${nirfBadge}</div>
+        <button type="button" class="ranking-compare-btn${inCompare ? ' active' : ''}" data-ranking-compare="${c.code}">
+          <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+          ${inCompare ? 'Remove' : 'Compare'}
+        </button>
       </div>
       <div class="ranking-card-score ${tierClass}">${score}</div>
     `;
     card.addEventListener('click', () => openCollegeModal(c.code));
+    card.querySelector('.ranking-compare-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      toggleCompare(c.code);
+    });
     container.appendChild(card);
   });
 }
@@ -1308,13 +1317,19 @@ function buildCollegeCard(c, rank = null) {
     </div>
     <div class="card-footer-buttons">
       <button type="button" class="btn btn-secondary btn-sm btn-detail" data-code="${c.code}">Full Details</button>
+      <button type="button" class="btn btn-sm btn-compare-card${inCompare ? ' active' : ''}" data-compare-code="${c.code}">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+        ${inCompare ? 'Remove' : 'Compare'}
+      </button>
       <button type="button" class="btn btn-primary btn-sm btn-add-pref-multi" data-code="${c.code}">
         <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M12 5v14M5 12h14"/></svg> Add Options
       </button>
     </div>
   `;
 
-  card.querySelector('[data-compare-code]').addEventListener('click', e => { e.stopPropagation(); toggleCompare(c.code); });
+  card.querySelectorAll('[data-compare-code]').forEach(btn =>
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleCompare(c.code); })
+  );
   card.querySelector('.btn-detail').addEventListener('click', () => openCollegeModal(c.code));
   const viewMore = card.querySelector('.view-more-branches');
   if (viewMore) viewMore.addEventListener('click', e => { e.preventDefault(); openCollegeModal(c.code); });
@@ -1331,7 +1346,16 @@ function toggleCompare(code) {
     if (state.compareList.length >= 4) { alert('You can compare up to 4 colleges.'); return; }
     state.compareList.push(code);
   }
-  updateCompareBadge(); renderPredictor();
+  updateCompareBadge(); renderPredictor(); syncRankingCompareButtons();
+}
+
+function syncRankingCompareButtons() {
+  document.querySelectorAll('[data-ranking-compare]').forEach(btn => {
+    const code = btn.getAttribute('data-ranking-compare');
+    const inList = state.compareList.includes(code);
+    btn.classList.toggle('active', inList);
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg> ${inList ? 'Remove' : 'Compare'}`;
+  });
 }
 
 function updateCompareBadge() {

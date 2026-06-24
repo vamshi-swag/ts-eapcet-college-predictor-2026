@@ -543,6 +543,20 @@ select:focus { border-color: var(--secondary); outline: none; box-shadow: 0 0 0 
 .prob-2026.prob-vl { background: var(--reach-bg);  color: var(--reach-color);  border-color: var(--reach-border); }
 
 .card-footer-buttons { border-top: 1px solid var(--border); padding-top: 10px; display: flex; gap: 6px; }
+
+/* Compare button in card footer — hidden on desktop, shown on mobile */
+.btn-compare-card {
+  display: none;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+}
+.btn-compare-card:hover { border-color: var(--secondary); color: var(--secondary); }
+.btn-compare-card.active {
+  background: var(--reach-bg);
+  color: var(--reach-color);
+  border-color: var(--reach-border);
+}
 .btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px;
   border-radius: var(--radius-sm); font-size: 12px; font-weight: 700;
@@ -604,6 +618,17 @@ select:focus { border-color: var(--secondary); outline: none; box-shadow: 0 0 0 
 .ranking-card-name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ranking-card-meta { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 .ranking-card-badges { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
+.ranking-compare-btn {
+  display: none;
+  align-items: center; justify-content: center; gap: 4px;
+  margin-top: 6px; width: 100%;
+  padding: 5px 6px; font-size: 10.5px; font-weight: 600;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--text-muted);
+  cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ranking-compare-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-10); }
+.ranking-compare-btn.active { background: var(--accent-10); color: var(--accent); border-color: var(--accent); }
 .ranking-card-score {
   font-size: 10px; font-weight: 700;
   background: var(--bg-app); border: 1px solid var(--border);
@@ -956,6 +981,7 @@ button { cursor: pointer; }
 @media (max-width: 1024px) {
   .app-container { grid-template-columns: 280px 1fr; }
   .college-ranking-grid { grid-template-columns: 1fr 1fr; }
+  .ranking-compare-btn { display: inline-flex; }
 }
 
 /* ══════════════════════════════════════════════
@@ -4027,8 +4053,13 @@ button { cursor: pointer; }
 /* ══════════════════════════════════════════════
    COLLEGE CARD — Mobile action buttons polish
 ══════════════════════════════════════════════ */
-@media (max-width: 480px) {
-  /* Action buttons wrap into 2×2 grid on very small screens */
+@media (max-width: 768px) {
+  /* Show the compare button in the card footer on mobile */
+  .btn-compare-card { display: inline-flex; }
+
+  /* Switch card footer to 2-col grid so 3 buttons lay out cleanly:
+     [Full Details] [Compare]
+     [Add Options — full width]  */
   .card-footer-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4036,14 +4067,18 @@ button { cursor: pointer; }
   }
   .card-footer-buttons .btn {
     justify-content: center;
-    font-size: 11px;
-    padding: 7px 8px;
+    font-size: 11.5px;
+    padding: 8px 8px;
   }
-  /* The "Add Options" button spans full width if it's alone or last */
+  /* Add Options (3rd / last-odd) spans full width */
   .card-footer-buttons .btn:only-child,
   .card-footer-buttons .btn:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
+}
+
+@media (max-width: 480px) {
+  .card-footer-buttons .btn { font-size: 11px; padding: 7px 8px; }
 }
 
 /* Minimum touch target for icon-only buttons in cards */
