@@ -7,7 +7,7 @@ This document provides a comprehensive technical overview and architectural guid
 # 1 Project Overview
 
 *   **Project Name:** MarsMate TS-EAPCET 2026 College Predictor & Counselling Companion
-*   **Purpose:** An interactive single-page application (SPA) designed to assist students navigating the Telangana EAPCET (Engineering, Agriculture, and Medical Common Entrance Test) 2026 admissions cycle. It enables candidates to predict admission outcomes based on rank or marks, organize preferred options, simulate seat allotments, check fee reimbursement statuses, and verify necessary document checklists.
+*   **Purpose:** An interactive single-page application (SPA) designed to assist students navigating the Telangana EAPCET (Engineering, Agriculture, and Medical Common Entrance Test) 2026 admissions c[...]
 *   **Tech Stack:**
     *   **Languages:** HTML5, CSS3, JavaScript (ES6 Modules), Python (Data Pipelines)
     *   **Frameworks:** None (Pure Vanilla frontend design)
@@ -87,17 +87,17 @@ ts-eapcet-college-predictor/
 
 ```mermaid
 graph TD
-    subgraph ETL Compilation Phase (Offline)
+    subgraph ETL["ETL Compilation Phase (Offline)"]
         CSVs[CSV/TXT Reference Data] --> PythonCompiler[process_data.py]
         PythonCompiler --> JSData[data.js]
     end
-
-    subgraph Client-Side Architecture (Runtime)
+    
+    subgraph Client["Client-Side Architecture (Runtime)"]
         JSData -->|Import Arrays| AppJS[app.js]
         StatsJS[stats.js] -->|Track Telemetry| AppJS
         AnalyticsJS[analytics.js] -->|Event logs| AppJS
         AuthJS[auth.js] -->|Inject State| AppJS
-
+        
         AppJS -->|Manipulate DOM| HTML[index.html]
         AppJS -->|Store state| LocalStorage[(Browser LocalStorage)]
         
@@ -105,12 +105,14 @@ graph TD
         StatsJS -.->|Optional RTDB Sync| FirebaseDB[Firebase RTDB]
         AnalyticsJS -.->|Optional Event Sync| FirebaseDB
     end
+    
+    ETL --> Client
 ```
 
 ### Architecture Patterns & Design Decisions
-*   **Decoupled Client-Side Engine:** All operations (such as seat prediction S-curves, fee calculations, rank interpolations, and sorting) run in-memory inside the client browser. No custom web server is required.
+*   **Decoupled Client-Side Engine:** All operations (such as seat prediction S-curves, fee calculations, rank interpolations, and sorting) run in-memory inside the client browser. No custom web serve[...]
 *   **Static Data Bundling:** Reference datasets are loaded upfront from `data.js` (approx. 2.5 MB containing thousands of records). This yields instantaneous client response speeds.
-*   **Fallback Local Persistence:** State management (checklists, option order selections) resides in client `localStorage`. Authentication switches dynamically to "Demo Mode" using `localStorage` mocks when Firebase keys are omitted.
+*   **Fallback Local Persistence:** State management (checklists, option order selections) resides in client `localStorage`. Authentication switches dynamically to "Demo Mode" using `localStorage` moc[...]
 *   **Event-Driven UI Updates:** Vanilla event listeners bind form state modifications directly to DOM re-renders without high-overhead frameworks.
 
 ---
@@ -119,7 +121,7 @@ graph TD
 
 ### 1. Student Profile Configurator
 *   **Description:** Gathers basic candidate parameters used across all calculators.
-*   **Inputs:** Rank or Marks (interpolates predicted rank via `estimateRank()`), Reservation Category (OC, BC, SC, ST, EWS), Gender (Boys/Girls/General), Region Eligibility (OU Local/Non-Local), Annual Family Income, TS Study history.
+*   **Inputs:** Rank or Marks (interpolates predicted rank via `estimateRank()`), Reservation Category (OC, BC, SC, ST, EWS), Gender (Boys/Girls/General), Region Eligibility (OU Local/Non-Local), Annu[...]
 *   **APIs/Services:** Local state mapping.
 
 ### 2. Live Admission Chance Engine
@@ -312,7 +314,7 @@ The project has no server-side execution environment. Backend operations are han
 *   **Input Sanitization:** Input inputs are parsed through `cleanInt()` and sanitization wrappers before being added to HTML templates.
 *   **Potential Vulnerabilities:**
     *   *Public Client Configs:* Firebase keys are exposed on the client. Database rules must be properly secured to prevent unauthorized database modifications.
-    *   *Lack of Server Verification:* All checks (such as seat allotments and fee calculations) are performed client-side. The user interface advises validating results against official EAPCET portals.
+    *   *Lack of Server Verification:* All checks (such as seat allotments and fee calculations) are performed client-side. The user interface advises validating results against official EAPCET portal[...]
 
 ---
 
@@ -436,9 +438,9 @@ sequenceDiagram
 
 # 18 Technical Debt
 
-1.  **Monolithic Main Controller:** `app.js` is over $3,400$ lines long. It handles DOM manipulation, simulation algorithms, layout setups, and calculations in a single file. Splitting this into helper modules would improve codebase maintainability.
+1.  **Monolithic Main Controller:** `app.js` is over $3,400$ lines long. It handles DOM manipulation, simulation algorithms, layout setups, and calculations in a single file. Splitting this into helpe[...]
 2.  **Duplicate waiver algorithms:** The logic for checking reimbursement qualifications is implemented separately in both the sidebar panel and the counselling calculator.
-3.  **Large Client Bundles:** `data.js` contains a $2.5\text{MB}$ payload that must be loaded entirely into client memory on initial load. This could be optimized by using lazy-loaded JSON chunks for each district or college type.
+3.  **Large Client Bundles:** `data.js` contains a $2.5\text{MB}$ payload that must be loaded entirely into client memory on initial load. This could be optimized by using lazy-loaded JSON chunks for [...]
 
 ---
 
